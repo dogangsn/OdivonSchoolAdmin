@@ -50,7 +50,7 @@ npm run build      # dist/OdivonSchoolAdmin/browser
 5. **Otomatik deploy (isteğe bağlı):** GitHub OIDC havuzu (`github-actions`) şu an ana repoya
    izin veriyor. Bu repoyu da ekleyin (provider'ın attribute condition'ına
    `dogangsn/OdivonSchoolAdmin`, servis hesabına `roles/iam.workloadIdentityUser`), sonra
-   repo ayarlarında **Variables → `DEPLOY_ENABLED` = `true`**. Her `main` push'u otomatik yayınlanır.
+   repo ayarlarında **Variables → `DEPLOY_ENABLED` = `true`**. Her `master` push'u otomatik yayınlanır.
 
 ## Notlar
 
