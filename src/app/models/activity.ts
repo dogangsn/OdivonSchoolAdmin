@@ -71,3 +71,54 @@ export const GAME_LABELS: Record<string, string | undefined> = {
   reading: 'Sesli Okuma',
   attention: 'Dikkat',
 };
+
+/** classes/{id}/progress/{uid}: running totals kept by the student's app. */
+export interface ClassProgress {
+  uid: string;
+  displayName: string;
+  lastActiveAt: number;
+  streakDays: number;
+  activities: number;
+  answered: number;
+  correct: number;
+  topics: Record<string, { label: string; subject: string; correct: number; total: number; lastAt: number }>;
+}
+
+/** classes/{id}/assignments/{aid}: a teacher's ödev. */
+export interface Assignment {
+  id: string;
+  classId: string;
+  teacherId: string;
+  kind: 'custom-quiz' | 'custom-match' | 'pool-quiz' | 'speed' | 'exam';
+  title: string;
+  subject: string;
+  dueAt: number | null;
+  createdAt: number;
+  questionCount?: number;
+}
+
+export const ASSIGNMENT_KIND_LABELS: Record<Assignment['kind'], string> = {
+  'custom-quiz': 'Öğretmen testi',
+  'custom-match': 'Eşleştirme',
+  'pool-quiz': 'Havuzdan test',
+  speed: 'Hız Turu',
+  exam: 'Sınav',
+};
+
+/** classes/{id}/assignments/{aid}/submissions/{uid} */
+export interface Submission {
+  uid: string;
+  displayName: string;
+  score: number;
+  stars: number;
+  correct: number;
+  total: number;
+  bestScore: number;
+  attempts: number;
+  firstCompletedAt: number;
+}
+
+/** Same key the Okullar page groups teachers by. */
+export function schoolKey(name: string | undefined | null): string {
+  return (name || '').toLocaleLowerCase('tr').replace(/\s+/g, ' ').replace(/[.,]/g, '').trim() || 'okul-belirtilmemis';
+}

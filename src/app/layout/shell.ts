@@ -50,6 +50,7 @@ export class Shell {
       items: [
         { path: '/', label: 'Genel Bakış', icon: 'home', exact: true },
         { path: '/aktivite', label: 'Aktivite ve Kullanım', icon: 'pulse' },
+        { path: '/buyume', label: 'Büyüme Analizi', icon: 'chart' },
       ],
     },
     {
@@ -64,6 +65,7 @@ export class Shell {
     {
       title: 'İçerik',
       items: [
+        { path: '/icerik', label: 'İçerik Performansı', icon: 'fire' },
         { path: '/soru-havuzu', label: 'Soru Havuzu', icon: 'book' },
         { path: '/onay', label: 'Soru Onayı', icon: 'check' },
       ],
@@ -76,6 +78,7 @@ export class Shell {
 
   pageTitle = computed(() => {
     const u = this.url().split('?')[0];
+    if (u.startsWith('/siniflar')) return 'Okullar ve Sınıflar';
     for (const g of this.groups) for (const i of g.items) if (i.exact ? u === i.path : u.startsWith(i.path) && i.path !== '/') return i.label;
     return u === '/' ? 'Genel Bakış' : 'Yönetim';
   });

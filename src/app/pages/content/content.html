@@ -1,0 +1,126 @@
+<app-page-header title="İçerik Performansı" [subtitle]="'Konu ve soru bazında öğrenci başarısı · son ' + data.activityDays() + ' gündeki testler'">
+  <select class="input !w-44 !py-2" [value]="level()" (change)="level.set($any($event.target).value)">
+    <option value="all">Tüm kademeler</option>
+    @for (l of levels; track l) { <option [value]="l">{{ levelLabels[l] }}</option> }
+  </select>
+  <div class="seg">
+    @for (d of [30, 90]; track d) { <button [class.on]="data.activityDays() === d" (click)="data.setActivityDays(d)">{{ d }} gün</button> }
+  </div>
+  <button class="btn-primary" (click)="exportCsv()"><app-icon name="download" size="w-4 h-4" /> CSV</button>
+</app-page-header>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+  <app-kpi label="Cevaplanan soru" [value]="answered().toLocaleString('tr-TR')" icon="doc" tone="sky" [hint]="attempts().length + ' test · ' + topics().length + ' konu'" />
+  <app-kpi label="Ortalama başarı" [value]="'%' + rate()" icon="check" tone="emerald" hint="Doğru / cevaplanan" />
+  <app-kpi label="Soru başına süre" [value]="avgSec() + ' sn'" icon="clock" tone="amber" hint="Ortalama cevaplama süresi" />
+  <app-kpi label="Boş bırakılan" [value]="'%' + blankRate()" icon="warning" tone="rose" [hint]="qstats().length + ' soru ' + minAnswers + '+ kez cevaplandı'" />
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+  <div class="card p-6">
+    <div class="card-title">Kademeye göre başarı</div>
+    <div class="card-sub mb-5">Doğru oranı</div>
+    <app-hbars [data]="levelRate()" unit="%" [scale]="100" color="#10b981" />
+  </div>
+  <div class="card p-6">
+    <div class="card-title">Derse göre süre</div>
+    <div class="card-sub mb-5">Soru başına ortalama saniye</div>
+    <app-hbars [data]="subjectTime()" unit=" sn" color="#f59e0b" />
+  </div>
+</div>
+
+<div class="card mt-5 overflow-hidden">
+  <div class="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800">
+    <div>
+      <div class="card-title">Sorular</div>
+      <div class="card-sub">En az {{ minAnswers }} kez cevaplanan sorular{{ loadingQ() ? ' · metinler yükleniyor…' : '' }}</div>
+    </div>
+    <div class="seg">
+      <button [class.on]="qView() === 'hard'" (click)="qView.set('hard')">En zor 20</button>
+      <button [class.on]="qView() === 'easy'" (click)="qView.set('easy')">En kolay 20</button>
+      <button [class.on]="qView() === 'slow'" (click)="qView.set('slow')">En uzun süren 20</button>
+    </div>
+  </div>
+  <div class="divide-y divide-slate-100 dark:divide-slate-800">
+    @for (s of qList(); track s.id) {
+      <div class="p-5 flex flex-col lg:flex-row gap-4">
+        <div class="lg:w-36 shrink-0 flex lg:flex-col gap-3 lg:gap-1">
+          <div class="text-2xl font-black" [class]="rateCls(s.rate)">%{{ s.rate }}</div>
+          <div class="text-[11px] text-slate-500 font-semibold">{{ s.correct }}/{{ s.n }} doğru · {{ s.avgSec }} sn</div>
+        </div>
+        <div class="flex-1 min-w-0">
+          @if (catMap().get(s.categoryId); as c) {
+            <div class="text-[11px] font-bold text-indigo-500 uppercase tracking-wider mb-1">{{ levelLabels[c.level] }} · {{ c.subject }} · {{ c.topic }}</div>
+          }
+          @if (questions().get(s.id); as q) {
+            <div class="text-sm font-semibold text-slate-900 dark:text-white whitespace-pre-line">{{ q.prompt }}</div>
+            <div class="grid sm:grid-cols-2 gap-1.5 mt-2">
+              @for (o of q.options; track o.id) {
+                <div class="text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-2"
+                  [class]="o.id === q.correctOptionId ? 'bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/50 dark:text-emerald-300' : trap(s)?.id === o.id ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300' : 'text-slate-600 dark:text-slate-300'">
+                  <span class="flex-1">{{ o.id.toUpperCase() }}) {{ o.text }}</span>
+                  <span class="font-black">%{{ Math.round(((s.picks[o.id] || 0) / s.n) * 100) }}</span>
+                </div>
+              }
+            </div>
+            @if (trap(s); as t) {
+              @if (t.pct >= 30) {
+                <div class="text-[11px] font-semibold text-rose-600 mt-2">Çeldirici: öğrencilerin %{{ t.pct }}'i {{ t.id.toUpperCase() }} şıkkını seçti. Soru ya da açıklama gözden geçirilmeli.</div>
+              }
+            }
+          } @else {
+            <div class="skeleton h-12"></div>
+          }
+        </div>
+        <div class="shrink-0">
+          <a [routerLink]="['/soru-havuzu']" class="btn-ghost btn-sm"><app-icon name="book" size="w-3.5 h-3.5" /> Havuz</a>
+        </div>
+      </div>
+    } @empty {
+      <app-empty icon="doc" title="Yeterli veri yok" [text]="'Bir sorunun burada görünmesi için en az ' + minAnswers + ' kez cevaplanması gerekiyor.'" />
+    }
+  </div>
+</div>
+
+<div class="card mt-5 overflow-hidden">
+  <div class="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800">
+    <div>
+      <div class="card-title">Konular</div>
+      <div class="card-sub">Test çözülen her konu</div>
+    </div>
+    <select class="input !w-56 !py-2" [value]="sort()" (change)="sort.set($any($event.target).value)">
+      <option value="tests">En çok çözülen</option>
+      <option value="rate">En düşük başarı</option>
+      <option value="rateDesc">En yüksek başarı</option>
+      <option value="time">En uzun süren</option>
+    </select>
+  </div>
+  <div class="overflow-x-auto custom-scroll max-h-[600px]">
+    <table class="data">
+      <thead class="sticky top-0"><tr><th>Konu</th><th>Ders</th><th>Kademe</th><th>Test</th><th>Öğrenci</th><th>Soru</th><th class="w-48">Başarı</th><th>Süre</th></tr></thead>
+      <tbody>
+        @for (t of topics(); track t.id) {
+          <tr>
+            <td class="font-semibold text-slate-900 dark:text-white min-w-[200px]">{{ t.cat?.topic ?? t.id }}</td>
+            <td class="text-xs">{{ t.cat?.subject }}</td>
+            <td class="text-xs whitespace-nowrap">{{ t.cat ? levelLabels[t.cat.level] : '' }}{{ t.cat?.grades?.length === 1 ? ' · ' + t.cat!.grades![0] + '. sınıf' : '' }}</td>
+            <td class="font-bold">{{ t.tests }}</td>
+            <td class="text-xs">{{ t.students }}</td>
+            <td class="text-xs">{{ t.q }}</td>
+            <td>
+              <div class="flex items-center gap-2">
+                <div class="h-2 flex-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                  <div class="h-full rounded-full" [class]="t.rate >= 70 ? 'bg-emerald-500' : t.rate >= 50 ? 'bg-amber-500' : 'bg-rose-500'" [style.width.%]="t.rate"></div>
+                </div>
+                <span class="text-xs font-black w-9 text-right">%{{ t.rate }}</span>
+              </div>
+            </td>
+            <td class="text-xs whitespace-nowrap">{{ t.avg }} sn</td>
+          </tr>
+        } @empty {
+          <tr><td colspan="8"><app-empty icon="book" title="Bu aralıkta test yok" /></td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

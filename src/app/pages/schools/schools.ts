@@ -4,7 +4,7 @@ import { DataService } from '../../core/data.service';
 import { ToastService } from '../../core/toast.service';
 import { ago, downloadCsv, fmtDate, toCsv } from '../../core/metrics';
 import { AppUser } from '../../models/user';
-import { Classroom } from '../../models/activity';
+import { Classroom, schoolKey } from '../../models/activity';
 import { Icon } from '../../shared/icon';
 import { Avatar, Badge, Empty, Kpi, PageHeader } from '../../shared/ui';
 import { HBars } from '../../shared/charts';
@@ -57,7 +57,7 @@ export class Schools {
     const counts = this.memberCounts();
     for (const t of this.teachers()) {
       const name = (t.school || '').trim() || 'Okul belirtilmemiş';
-      const key = norm(name);
+      const key = schoolKey(t.school);
       const row = map.get(key) ?? { key, name, teachers: [], verified: 0, classes: [], students: 0, lastSeen: 0 };
       row.teachers.push(t);
       if (t.teacherVerified) row.verified++;
@@ -69,7 +69,7 @@ export class Schools {
     }
     const q = norm(this.q());
     return [...map.values()]
-      .filter((r) => !q || r.key.includes(q) || r.teachers.some((t) => norm(t.displayName || '').includes(q)))
+      .filter((r) => !q || norm(r.name).includes(q) || r.teachers.some((t) => norm(t.displayName || '').includes(q)))
       .sort((a, b) => b.students - a.students || b.teachers.length - a.teachers.length);
   });
 
@@ -92,7 +92,7 @@ export class Schools {
 
   totalStudents = computed(() => Object.values(this.memberCounts()).reduce((s: number, n) => s + (n ?? 0), 0));
   pending = computed(() => this.teachers().filter((t) => !t.teacherVerified).length);
-  namedSchools = computed(() => this.schools().filter((s) => s.key !== norm('Okul belirtilmemiş')).length);
+  namedSchools = computed(() => this.schools().filter((s) => s.key !== 'okul-belirtilmemis').length);
   gradeDist = computed(() => {
     const m = new Map<number, number>();
     for (const c of this.classes()) m.set(c.grade, (m.get(c.grade) ?? 0) + 1);

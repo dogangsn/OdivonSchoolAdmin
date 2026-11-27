@@ -24,7 +24,7 @@
         </div>
         <div class="text-sm text-slate-500 mt-1 flex flex-wrap gap-x-4 gap-y-1">
           <span>{{ isStudentAccountEmail(u.email) ? 'Kullanıcı adı: ' + (u.username || '—') + ' (öğretmen açtı)' : u.email }}</span>
-          @if (u.school) { <span>🏫 {{ u.school }}{{ u.branch ? ' · ' + u.branch : '' }}</span> }
+          @if (u.school) { <a [routerLink]="['/okullar', schoolKey(u.school)]" class="hover:text-indigo-600">🏫 {{ u.school }}{{ u.branch ? ' · ' + u.branch : '' }}</a> }
           @if (u.grade) { <span>🎒 {{ u.grade }}. sınıf</span> } @else if (u.gradeLevel) { <span>🎒 {{ levelLabels[u.gradeLevel] }}</span> }
           <span>Kayıt {{ fmtDate(u.createdAt) }}</span>
           <span>Son görülme {{ ago(u.lastSeenAt) }}</span>
@@ -253,6 +253,29 @@
           <button class="btn-danger w-full" [disabled]="busy() || isSelf()" (click)="suspend()">Hesabı askıya al</button>
         }
       </div>
+
+      @if (classes().length || u.role === 'teacher') {
+        <div class="card p-6">
+          <div class="card-title">{{ u.role === 'teacher' ? 'Açtığı sınıflar' : 'Sınıfları' }}</div>
+          <div class="card-sub mb-3">{{ classes().length }} sınıf</div>
+          <ul class="space-y-1 -mx-2">
+            @for (c of classes(); track c.id) {
+              <li>
+                <a [routerLink]="['/siniflar', c.id]" class="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                  <div class="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-950/60 text-sky-600 flex items-center justify-center text-xs font-black">{{ c.grade }}</div>
+                  <div class="min-w-0 flex-1">
+                    <div class="text-xs font-bold text-slate-900 dark:text-white truncate">{{ c.name }}</div>
+                    <div class="text-[11px] text-slate-500 truncate">{{ u.role === 'teacher' ? 'Kod ' + c.joinCode : c.teacherName }}</div>
+                  </div>
+                  <app-icon name="chevronRight" size="w-4 h-4" class="text-slate-300" />
+                </a>
+              </li>
+            } @empty {
+              <li class="text-xs text-slate-400 px-2">Sınıf yok</li>
+            }
+          </ul>
+        </div>
+      }
 
       <div class="card p-6">
         <div class="card-title">Yönetici notu</div>

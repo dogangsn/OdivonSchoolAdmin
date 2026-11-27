@@ -56,14 +56,16 @@
                 <td>
                   <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 flex items-center justify-center"><app-icon name="school" size="w-4.5 h-4.5" /></div>
-                    <span class="font-bold text-slate-900 dark:text-white">{{ s.name }}</span>
+                    <a [routerLink]="['/okullar', s.key]" (click)="$event.stopPropagation()" class="font-bold text-slate-900 dark:text-white hover:text-indigo-600">{{ s.name }}</a>
                   </div>
                 </td>
                 <td class="text-xs"><b>{{ s.teachers.length }}</b> <span class="text-slate-400">({{ s.verified }} onaylı)</span></td>
                 <td class="font-bold">{{ s.classes.length }}</td>
                 <td class="font-bold">{{ countingMembers() ? '…' : s.students }}</td>
                 <td class="text-xs">{{ ago(s.lastSeen || null) }}</td>
-                <td class="text-right"><app-icon [name]="openSchool() === s.key ? 'arrowUp' : 'chevronRight'" size="w-4 h-4" class="text-slate-400" /></td>
+                <td class="text-right whitespace-nowrap">
+                  <a [routerLink]="['/okullar', s.key]" (click)="$event.stopPropagation()" class="btn-ghost btn-sm">Detay</a>
+                </td>
               </tr>
               @if (openSchool() === s.key) {
                 <tr class="!bg-slate-50/70 dark:!bg-slate-800/20">
@@ -83,7 +85,7 @@
                         <div class="label">Sınıflar</div>
                         @for (c of s.classes; track c.id) {
                           <div class="flex items-center justify-between py-1.5 text-xs">
-                            <span><b>{{ c.name }}</b> · {{ c.grade }}. sınıf · {{ c.teacherName }}</span>
+                            <span><a [routerLink]="['/siniflar', c.id]" class="font-bold hover:text-indigo-600">{{ c.name }}</a> · {{ c.grade }}. sınıf · {{ c.teacherName }}</span>
                             <span class="font-bold">{{ memberCounts()[c.id] ?? '…' }} öğrenci</span>
                           </div>
                         } @empty {
@@ -137,21 +139,22 @@
     @case ('classes') {
       <div class="overflow-x-auto custom-scroll">
         <table class="data">
-          <thead><tr><th>Sınıf</th><th>Öğretmen</th><th>Seviye</th><th>Öğrenci</th><th>Katılım kodu</th><th>Açılış</th></tr></thead>
+          <thead><tr><th>Sınıf</th><th>Öğretmen</th><th>Seviye</th><th>Öğrenci</th><th>Katılım kodu</th><th>Açılış</th><th></th></tr></thead>
           <tbody>
             @for (c of classRows(); track c.id) {
               <tr class="cursor-pointer" (click)="toggleClass(c)">
-                <td class="font-bold text-slate-900 dark:text-white">{{ c.name }}</td>
+                <td><a [routerLink]="['/siniflar', c.id]" (click)="$event.stopPropagation()" class="font-bold text-slate-900 dark:text-white hover:text-indigo-600">{{ c.name }}</a></td>
                 <td class="text-xs"><a [routerLink]="['/kullanicilar', c.teacherId]" (click)="$event.stopPropagation()" class="hover:text-indigo-600">{{ c.teacherName }}</a>
                   <div class="text-[11px] text-slate-400">{{ userMap().get(c.teacherId)?.school }}</div></td>
                 <td class="text-xs">{{ c.grade }}. sınıf</td>
                 <td class="font-bold">{{ memberCounts()[c.id] ?? '…' }}</td>
                 <td><span class="font-mono text-xs px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800">{{ c.joinCode }}</span></td>
                 <td class="text-xs">{{ fmtDate(c.createdAt) }}</td>
+                <td class="text-right"><a [routerLink]="['/siniflar', c.id]" (click)="$event.stopPropagation()" class="btn-ghost btn-sm">Detay</a></td>
               </tr>
               @if (openClass() === c.id) {
                 <tr class="!bg-slate-50/70 dark:!bg-slate-800/20">
-                  <td colspan="6">
+                  <td colspan="7">
                     <div class="flex flex-wrap gap-2 py-1">
                       @for (m of classMembers(); track m.uid) {
                         <a [routerLink]="['/kullanicilar', m.uid]" class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:border-indigo-400">

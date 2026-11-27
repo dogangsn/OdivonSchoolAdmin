@@ -1,0 +1,84 @@
+<app-page-header title="Büyüme Analizi" subtitle="Kayıt hunisi, aylık kayıtlar ve haftalık kohortlarda kullanıcı tutma">
+  <div class="seg">
+    <button [class.on]="audience() === 'all'" (click)="audience.set('all')">Herkes</button>
+    <button [class.on]="audience() === 'student'" (click)="audience.set('student')">Öğrenci</button>
+    <button [class.on]="audience() === 'teacher'" (click)="audience.set('teacher')">Öğretmen</button>
+  </div>
+  <div class="seg">
+    <button [class.on]="range() === 30" (click)="range.set(30)">30 gün</button>
+    <button [class.on]="range() === 90" (click)="range.set(90)">90 gün</button>
+    <button [class.on]="range() === 0" (click)="range.set(0)">Tümü</button>
+  </div>
+</app-page-header>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+  <app-kpi label="Yeni kayıt" [value]="funnel()[0].n" icon="users" tone="indigo" [hint]="range() ? 'Son ' + range() + ' gün' : 'Tüm zamanlar'" />
+  <app-kpi label="Etkinleşme" [value]="'%' + funnel()[2].pct" icon="pulse" tone="sky" hint="Kayıttan sonra test ya da oyun yapan" />
+  <app-kpi label="Ödemeye dönüşüm" [value]="'%' + funnel()[4].pct" icon="money" tone="emerald" [hint]="daysToPay() === null ? 'Henüz abonelik yok' : 'Kayıttan aboneliğe ortanca ' + daysToPay() + ' gün'" />
+  <app-kpi label="1. hafta tutma" [value]="week1() === null ? '—' : '%' + week1()" icon="history" tone="purple" hint="Kayıttan sonraki hafta tekrar çalışan" />
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-5 gap-5 mt-5">
+  <div class="card p-6 xl:col-span-3">
+    <div class="card-title">Kayıt hunisi</div>
+    <div class="card-sub mb-6">Her adımın yanında bir önceki adımdan geçiş oranı</div>
+    <div class="space-y-3">
+      @for (s of funnel(); track s.label; let i = $index) {
+        <div class="flex items-center gap-4">
+          <div class="w-48 shrink-0 text-xs font-bold text-slate-600 dark:text-slate-300">{{ s.label }}</div>
+          <div class="flex-1 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 overflow-hidden relative">
+            <div class="h-full rounded-xl transition-all flex items-center px-3" [style.width.%]="Math.max(s.pct, 4)" [style.background]="s.color">
+              <span class="text-xs font-black text-white">{{ s.n }}</span>
+            </div>
+          </div>
+          <div class="w-20 text-right">
+            <div class="text-sm font-black text-slate-900 dark:text-white">%{{ s.pct }}</div>
+            @if (i > 0) { <div class="text-[10px] font-bold text-slate-400">adım %{{ s.step }}</div> }
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+  <div class="card p-6 xl:col-span-2">
+    <div class="card-title">Aylık kayıt</div>
+    <div class="card-sub mb-5">Son 12 ay</div>
+    <app-bar-chart [data]="monthly()" color="#6366f1" [height]="200" />
+  </div>
+</div>
+
+<div class="card p-6 mt-5">
+  <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
+    <div>
+      <div class="card-title">Haftalık kohort tutma</div>
+      <div class="card-sub">Satır: kayıt haftası (Pazartesi). Hücre: o kohorttan kaç kişinin kayıttan N hafta sonra test ya da oyun bitirdiği.</div>
+    </div>
+    @if (data.attempts.loading() || data.games.loading()) { <span class="text-xs font-semibold text-slate-400">Aktivite yükleniyor…</span> }
+  </div>
+  <div class="overflow-x-auto custom-scroll">
+    <table class="w-full min-w-[720px] text-xs">
+      <thead>
+        <tr>
+          <th class="text-left font-bold uppercase tracking-wider text-[10px] text-slate-500 pb-2">Hafta</th>
+          <th class="text-left font-bold uppercase tracking-wider text-[10px] text-slate-500 pb-2">Kişi</th>
+          @for (k of offsets; track k) { <th class="font-bold uppercase tracking-wider text-[10px] text-slate-500 pb-2">{{ k === 0 ? 'Kayıt haftası' : k + '. hafta' }}</th> }
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of cohorts(); track r.label) {
+          <tr>
+            <td class="py-1 pr-3 font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap">{{ r.label }}</td>
+            <td class="py-1 pr-3 font-semibold text-slate-500">{{ r.size }}</td>
+            @for (v of r.cells; track $index) {
+              <td class="p-0.5">
+                <div class="h-9 rounded-lg flex items-center justify-center font-black" [style.background]="r.size ? cellBg(v) : 'transparent'"
+                  [class]="v === null || !r.size ? 'text-slate-300 dark:text-slate-700' : v > 45 ? 'text-white' : 'text-slate-700 dark:text-slate-200'">
+                  {{ v === null || !r.size ? '' : '%' + v }}
+                </div>
+              </td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

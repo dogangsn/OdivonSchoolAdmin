@@ -5,6 +5,7 @@ import {
   collection,
   deleteDoc,
   deleteField,
+  documentId,
   doc,
   getCountFromServer,
   getDoc,
@@ -22,7 +23,7 @@ import { SubscriptionEvent } from '../models/subscription';
 import { TestCategory } from '../models/test-category';
 import { TestAttempt } from '../models/test-attempt';
 import { Question } from '../models/question';
-import { Classroom, GameResult, Payment } from '../models/activity';
+import { Assignment, ClassProgress, Classroom, GameResult, Payment, Submission } from '../models/activity';
 import { DAY_MS } from '../models/subscription';
 
 export interface AdminNote {
@@ -223,6 +224,32 @@ export class DataService {
   async members(classId: string): Promise<{ uid: string; displayName: string; joinedAt: number }[]> {
     const snap = await getDocs(collection(this.fs, `classes/${classId}/members`));
     return snap.docs.map((d) => d.data() as any).sort((a, b) => (a.displayName ?? '').localeCompare(b.displayName ?? '', 'tr'));
+  }
+
+  async classProgress(classId: string): Promise<ClassProgress[]> {
+    const snap = await getDocs(collection(this.fs, `classes/${classId}/progress`));
+    return snap.docs.map((d) => ({ ...(d.data() as ClassProgress), uid: d.id }));
+  }
+
+  async assignments(classId: string): Promise<Assignment[]> {
+    const snap = await getDocs(collection(this.fs, `classes/${classId}/assignments`));
+    return snap.docs.map((d) => ({ ...(d.data() as Assignment), id: d.id })).sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  async submissions(classId: string, assignmentId: string): Promise<Submission[]> {
+    const snap = await getDocs(collection(this.fs, `classes/${classId}/assignments/${assignmentId}/submissions`));
+    return snap.docs.map((d) => ({ ...(d.data() as Submission), uid: d.id }));
+  }
+
+  /** Questions by id (Firestore `in` takes 30 at a time). */
+  async questionsByIds(ids: string[]): Promise<Question[]> {
+    const out: Question[] = [];
+    for (let i = 0; i < ids.length; i += 30) {
+      const chunk = ids.slice(i, i + 30);
+      const snap = await getDocs(query(collection(this.fs, 'questions'), where(documentId(), 'in', chunk)));
+      out.push(...snap.docs.map((d) => ({ ...(d.data() as Question), id: d.id })));
+    }
+    return out;
   }
 
   // ---- Question pool ----

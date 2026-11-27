@@ -20,7 +20,7 @@ import {
 import { AppUser, UserRole, isStudentAccountEmail, roleLabel } from '../../models/user';
 import { LEVEL_LABELS } from '../../models/test-category';
 import { TestAttempt } from '../../models/test-attempt';
-import { GAME_LABELS, GameResult, PAYMENT_STATUS_LABELS, Payment } from '../../models/activity';
+import { GAME_LABELS, GameResult, PAYMENT_STATUS_LABELS, Payment, schoolKey } from '../../models/activity';
 import { Icon } from '../../shared/icon';
 import { Avatar, Badge, Empty, Kpi } from '../../shared/ui';
 import { BarChart, HBars } from '../../shared/charts';
@@ -43,7 +43,7 @@ function addMonths(ms: number, months: number): number {
 })
 export class UserDetail {
   uid = input.required<string>();
-  private data = inject(DataService);
+  data = inject(DataService);
   private toast = inject(ToastService);
   private auth = inject(Auth);
 
@@ -59,6 +59,7 @@ export class UserDetail {
   readonly tl = tl;
   readonly isStudentAccountEmail = isStudentAccountEmail;
   readonly appUrl = environment.appUrl;
+  readonly schoolKey = schoolKey;
 
   user = signal<AppUser | null>(null);
   loading = signal(true);
@@ -121,9 +122,20 @@ export class UserDetail {
       .sort((a, b) => b.value - a.value);
   });
   byGame = computed(() => countBy(this.games(), (g) => GAME_LABELS[g.gameType] ?? g.gameType).map((r) => ({ label: r.key, value: r.count })));
+  /** Classes the teacher runs, or the student belongs to. */
+  classes = computed(() => {
+    const u = this.user();
+    if (!u) return [];
+    const all = this.data.classes.data();
+    if (u.role === 'teacher') return all.filter((c) => c.teacherId === u.uid);
+    const ids = new Set(u.classIds ?? []);
+    return all.filter((c) => ids.has(c.id));
+  });
+
   paidTotal = computed(() => this.payments().filter((p) => p.status === 'success').reduce((s, p) => s + (p.totalAmount ?? p.amount), 0));
 
   constructor() {
+    this.data.classes.load();
     effect(() => {
       const id = this.uid();
       this.load(id);
