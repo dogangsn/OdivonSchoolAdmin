@@ -127,6 +127,24 @@
             <app-badge tone="slate">{{ q.source === 'teacher' ? 'Öğretmen: ' + (q.authorName || '') : q.source === 'ai-generated' ? 'Yapay zekâ' : 'Elle' }}</app-badge>
             <span class="text-[11px] text-slate-400 ml-auto">Zorluk {{ q.difficulty }} · {{ q.usageCount || 0 }} kez · %{{ q.usageCount ? Math.round(((q.correctCount || 0) / q.usageCount) * 100) : 0 }} doğru</span>
           </div>
+          @if (duplicates().get(q.id); as other) {
+            <div class="mb-2 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">Benzer soru var: “{{ other }}…”</div>
+          }
+          @if (editing() === q.id) {
+            <textarea class="input min-h-20 mb-2" [ngModel]="draft().prompt" (ngModelChange)="patch({ prompt: $event })"></textarea>
+            @for (o of q.options; track o.id; let i = $index) {
+              <div class="flex items-center gap-2 mb-1.5">
+                <input type="radio" class="accent-emerald-600" [name]="'p' + q.id" [checked]="draft().correctOptionId === o.id" (change)="patch({ correctOptionId: o.id })" />
+                <span class="text-xs font-black w-4">{{ o.id.toUpperCase() }}</span>
+                <input class="input !py-1.5" [ngModel]="draft().options[i]" (ngModelChange)="setOption(i, $event)" />
+              </div>
+            }
+            <textarea class="input min-h-16 mt-1" placeholder="Açıklama" [ngModel]="draft().explanation" (ngModelChange)="patch({ explanation: $event })"></textarea>
+            <div class="flex gap-2 mt-2">
+              <button class="btn-primary btn-sm" (click)="saveEdit(q)">Kaydet</button>
+              <button class="btn-ghost btn-sm" (click)="editing.set(null)">Vazgeç</button>
+            </div>
+          } @else {
           <div class="text-sm font-semibold text-slate-900 dark:text-white whitespace-pre-line">{{ q.prompt }}</div>
           <ul class="mt-2 space-y-1">
             @for (o of q.options; track o.id) {
@@ -135,11 +153,13 @@
               </li>
             }
           </ul>
+          }
           <div class="flex flex-wrap gap-2 mt-3">
             @if (q.reviewStatus !== 'approved') { <button class="btn-success btn-sm" (click)="setStatus(q, 'approved')">Onayla</button> }
             @if (q.reviewStatus !== 'draft') { <button class="btn-ghost btn-sm" (click)="setStatus(q, 'draft')">Taslağa al</button> }
             @if (q.reviewStatus !== 'rejected') { <button class="btn-ghost btn-sm !text-rose-600" (click)="setStatus(q, 'rejected')">Reddet</button> }
-            <button class="btn-ghost btn-sm ml-auto" (click)="remove(q)"><app-icon name="trash" size="w-3.5 h-3.5" /> Sil</button>
+            <button class="btn-ghost btn-sm ml-auto" (click)="edit(q)"><app-icon name="pencil" size="w-3.5 h-3.5" /> Düzenle</button>
+            <button class="btn-ghost btn-sm" (click)="remove(q)"><app-icon name="trash" size="w-3.5 h-3.5" /> Sil</button>
           </div>
         </div>
       } @empty {

@@ -1,4 +1,6 @@
-<app-page-header title="Soru Onayı" subtitle="Yapay zekâ ve öğretmenlerden gelen taslak soruları inceleyin">
+<app-page-header title="Soru Onayı" subtitle="Yapay zekâ ile soru üretin, öğretmenlerden ve yapay zekâdan gelen taslakları inceleyin">
+  <button class="btn-ghost" (click)="openKey()"><app-icon name="shield" size="w-4 h-4" /> {{ ai.apiKey() ? 'API anahtarı ✓' : 'API anahtarı gir' }}</button>
+  <button class="btn-ghost" [disabled]="busy()" (click)="approveAll()"><app-icon name="check" size="w-4 h-4" /> Tüm taslakları onayla</button>
   <button class="btn-ghost" (click)="load()" [disabled]="loading()">
     <app-icon name="refresh" size="w-4 h-4" [class.animate-spin]="loading()" /> Yenile
   </button>
@@ -26,8 +28,58 @@
   </div>
 </div>
 
-<div class="mb-4 text-xs text-slate-500 font-semibold">
-  Yeni soru üretme (yapay zekâ) şimdilik ana uygulamadaki eski yönetim ekranında duruyor; burada üretilen taslakları onaylayabilirsiniz.
+<div class="card mb-5 overflow-hidden">
+  <button class="w-full p-5 flex items-center gap-4 text-left cursor-pointer" (click)="genOpen.set(!genOpen())">
+    <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20"><app-icon name="sparkles" /></div>
+    <div class="flex-1">
+      <div class="card-title">Yapay zekâ ile soru üret</div>
+      <div class="card-sub">{{ model }} · MEB soru yazım kılavuzuna göre, taslak olarak kaydedilir</div>
+    </div>
+    <app-icon [name]="genOpen() ? 'arrowUp' : 'chevronRight'" size="w-4 h-4" class="text-slate-400" />
+  </button>
+  @if (genOpen()) {
+    <div class="px-5 pb-5 grid grid-cols-1 lg:grid-cols-12 gap-3 items-end border-t border-slate-100 dark:border-slate-800 pt-4">
+      <div class="lg:col-span-5">
+        <label class="label">Konu</label>
+        <select class="input" [ngModel]="genCategoryId()" (ngModelChange)="genCategoryId.set($event)">
+          <option value="">Konu seçin…</option>
+          @for (g of catsByLevel(); track g.level) {
+            @if (g.cats.length) {
+              <optgroup [label]="levelLabels[g.level]">
+                @for (c of g.cats; track c.id) {
+                  <option [value]="c.id">{{ c.grades?.length === 1 ? c.grades![0] + '. sınıf · ' : '' }}{{ c.subject }} · {{ c.topic }}</option>
+                }
+              </optgroup>
+            }
+          }
+        </select>
+      </div>
+      <div class="lg:col-span-3">
+        <label class="label">Alt konu / odak (isteğe bağlı)</label>
+        <input class="input" placeholder="örn. kesirlerde toplama" [ngModel]="genSubTopic()" (ngModelChange)="genSubTopic.set($event)" />
+      </div>
+      <div class="lg:col-span-1">
+        <label class="label">Adet</label>
+        <input type="number" min="1" max="15" class="input" [ngModel]="genCount()" (ngModelChange)="genCount.set(+$event)" />
+      </div>
+      <div class="lg:col-span-1">
+        <label class="label">Zorluk</label>
+        <select class="input" [ngModel]="genDifficulty()" (ngModelChange)="genDifficulty.set(+$event)">
+          @for (n of [1, 2, 3, 4, 5]; track n) { <option [ngValue]="n">{{ n }}</option> }
+        </select>
+      </div>
+      <div class="lg:col-span-2">
+        <button class="btn-primary w-full !py-3" [disabled]="generating()" (click)="generate()">
+          <app-icon name="sparkles" size="w-4 h-4" [class.animate-pulse]="generating()" /> {{ generating() ? 'Üretiliyor…' : 'Üret' }}
+        </button>
+      </div>
+      @if (genCategory()?.outcomes?.length) {
+        <div class="lg:col-span-12 text-[11px] text-slate-500">
+          Öğrenme çıktıları: @for (o of genCategory()!.outcomes!; track o.code) { <span class="font-mono font-bold">{{ o.code }}</span>{{ $last ? '' : ', ' }} }
+        </div>
+      }
+    </div>
+  }
 </div>
 
 <div class="space-y-4">
@@ -98,3 +150,31 @@
     }
   }
 </div>
+
+@if (keyDrawer()) {
+  <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50" (click)="keyDrawer.set(false)"></div>
+  <div class="drawer fixed inset-y-0 right-0 max-w-md w-full bg-white dark:bg-slate-900 shadow-2xl z-50 flex flex-col border-l border-slate-200 dark:border-slate-800">
+    <div class="p-6 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between">
+      <div>
+        <h3 class="text-lg font-black text-slate-900 dark:text-white">Gemini API anahtarı</h3>
+        <p class="text-xs text-slate-500 mt-0.5">Anahtar yalnızca bu tarayıcıda saklanır, sunucuya kaydedilmez.</p>
+      </div>
+      <button class="w-9 h-9 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 flex items-center justify-center cursor-pointer" (click)="keyDrawer.set(false)"><app-icon name="x" /></button>
+    </div>
+    <div class="flex-1 p-6 space-y-4">
+      <div>
+        <label class="label">API anahtarı</label>
+        <input type="password" class="input font-mono" placeholder="AIza…" [ngModel]="keyInput()" (ngModelChange)="keyInput.set($event)" />
+        <p class="text-[11px] text-slate-500 mt-2">Google AI Studio → Get API key bölümünden alabilirsiniz.</p>
+      </div>
+      @if (keyMsg(); as m) {
+        <div class="p-3 rounded-xl text-xs font-semibold" [class]="m.ok ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'">{{ m.message }}</div>
+      }
+    </div>
+    <div class="p-6 border-t border-slate-200 dark:border-slate-800 flex gap-3 justify-end">
+      @if (ai.apiKey()) { <button class="btn-ghost mr-auto !text-rose-600" (click)="clearKey()">Anahtarı sil</button> }
+      <button class="btn-ghost" (click)="keyDrawer.set(false)">Vazgeç</button>
+      <button class="btn-primary" [disabled]="keyTesting()" (click)="saveKey()">{{ keyTesting() ? 'Deneniyor…' : 'Dene ve kaydet' }}</button>
+    </div>
+  </div>
+}

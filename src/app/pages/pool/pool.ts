@@ -1,5 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { DUPLICATE_SIMILARITY, similarity } from '../../core/similarity';
 import { CategoryPoolStat, DataService } from '../../core/data.service';
 import { ToastService } from '../../core/toast.service';
 import { ago, downloadCsv, toCsv } from '../../core/metrics';
@@ -19,7 +21,7 @@ interface Row {
 
 @Component({
   selector: 'app-pool',
-  imports: [RouterLink, Icon, Badge, Empty, Kpi, PageHeader],
+  imports: [RouterLink, FormsModule, Icon, Badge, Empty, Kpi, PageHeader],
   templateUrl: './pool.html',
 })
 export class Pool {
@@ -76,6 +78,52 @@ export class Pool {
   );
   readyCount = computed(() => this.rows().filter((r) => r.approved >= TARGET).length);
   emptyCount = computed(() => this.rows().filter((r) => r.approved === 0).length);
+
+  /** id → prompt start of a near-identical question in the same konu. */
+  duplicates = computed(() => {
+    const list = this.questions().filter((q) => q.reviewStatus !== 'rejected');
+    const out = new Map<string, string>();
+    for (let i = 0; i < list.length; i++)
+      for (let j = i + 1; j < list.length; j++)
+        if (similarity(list[i].prompt, list[j].prompt) >= DUPLICATE_SIMILARITY) {
+          out.set(list[i].id, list[j].prompt.slice(0, 60));
+          out.set(list[j].id, list[i].prompt.slice(0, 60));
+        }
+    return out;
+  });
+
+  editing = signal<string | null>(null);
+  draft = signal<{ prompt: string; explanation: string; correctOptionId: string; options: string[] }>({ prompt: '', explanation: '', correctOptionId: 'a', options: [] });
+
+  edit(q: Question) {
+    this.editing.set(q.id);
+    this.draft.set({ prompt: q.prompt, explanation: q.explanation, correctOptionId: q.correctOptionId, options: q.options.map((o) => o.text) });
+  }
+  patch(p: Partial<{ prompt: string; explanation: string; correctOptionId: string }>) {
+    this.draft.set({ ...this.draft(), ...p });
+  }
+  setOption(i: number, v: string) {
+    const options = [...this.draft().options];
+    options[i] = v;
+    this.draft.set({ ...this.draft(), options });
+  }
+  async saveEdit(q: Question) {
+    const d = this.draft();
+    const updates: Partial<Question> = {
+      prompt: d.prompt.trim(),
+      explanation: d.explanation.trim(),
+      correctOptionId: d.correctOptionId,
+      options: q.options.map((o, i) => ({ ...o, text: (d.options[i] ?? o.text).trim() })),
+    };
+    try {
+      await this.data.updateQuestion(q.id, updates);
+      this.questions.update((l) => l.map((x) => (x.id === q.id ? { ...x, ...updates } : x)));
+      this.editing.set(null);
+      this.toast.success('Soru güncellendi');
+    } catch (e: any) {
+      this.toast.error('Kaydedilemedi: ' + (e?.message ?? ''));
+    }
+  }
 
   visibleQuestions = computed(() => this.questions().filter((q) => this.qFilter() === 'all' || q.reviewStatus === this.qFilter()));
 

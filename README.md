@@ -18,8 +18,8 @@ Angular 20 (standalone + signals) · Tailwind CSS 4 · @angular/fire · Odivon t
 | Okullar ve Sınıflar | Öğretmen okullarına göre gruplama, öğretmen onayı, sınıflar ve üye sayıları, sınıf üyeleri |
 | Abonelikler | MRR/ARR, ARPU, kayıp oranı, plan/dönem/kaynak dağılımı, yenileme takvimi |
 | Ödemeler | PayTR siparişleri, günlük/aylık tahsilat, başarı oranı, paket ve durum dağılımı, CSV |
-| Soru Havuzu | Kademe bazında kapsam, konu başına onaylı/taslak sayısı (hedef 10), konudaki soruları yönetme |
-| Soru Onayı | Taslakları onaylama/reddetme/düzenleme, toplu onay (öğrencilere "yeni soru" bildirimi yazılır) |
+| Soru Havuzu | Kademe bazında kapsam, konu başına onaylı/taslak sayısı (hedef 10), konudaki soruları düzenleme, benzer soru uyarısı |
+| Soru Onayı | Gemini ile soru üretme (API anahtarı tarayıcıda), taslakları onaylama/reddetme/düzenleme, seçili ya da tüm taslakları onaylama (öğrencilere "yeni soru" bildirimi yazılır) |
 | İşlem Kayıtları | `subscriptionEvents` akışı, filtre ve CSV |
 
 ## Geliştirme
@@ -55,7 +55,7 @@ npm run build      # dist/OdivonSchoolAdmin/browser
 ## Notlar
 
 - Kurallar ana repoda (`OdivonSchool/firestore.rules`) yaşar; bu repo kural deploy etmez.
-- Yapay zekâ ile soru üretme şimdilik ana uygulamanın eski `/yonetim` ekranında; bu panel
-  üretilen taslakları onaylar.
+- Ana uygulamadaki eski `/yonetim` ekranı kaldırıldı (2026-11-27); tüm yönetim işleri bu paneldedir.
+- Soru üretme istemi `src/app/core/question-prompt.ts`, ana repodaki `scripts/question-prompt.js` ile aynı tutulmalı.
 - Aktivite metrikleri `testAttempts` ve `gameResults` koleksiyonlarından, "son görülme"
   metrikleri `users.lastSeenAt` alanından hesaplanır (2026-10-29'dan itibaren tutuluyor).
