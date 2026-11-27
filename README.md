@@ -36,17 +36,17 @@ npm run build      # dist/OdivonSchoolAdmin/browser
 
 1. **Hosting sitesi oluştur** (aynı projede ikinci site):
    ```bash
-   npx firebase-tools hosting:sites:create odivonschool-admin --project odivonschool
+   npx firebase-tools hosting:sites:create odivon-school-admin --project odivonschool
    ```
 2. **İlk deploy** (kendi bilgisayarınızdan):
    ```bash
    npm run build
    npx firebase-tools deploy --only hosting --project odivonschool
    ```
-   Panel `https://odivonschool-admin.web.app` adresinde açılır.
+   Panel `https://odivon-school-admin.web.app` adresinde açılır.
 3. **Auth alan adı:** Firebase Console → Authentication → Settings → Authorized domains:
-   `odivonschool-admin.web.app` (ve özel alan adı kullanacaksanız örn. `admin.school.odivon.com`).
-4. **Özel alan adı (isteğe bağlı):** Hosting → `odivonschool-admin` sitesi → Add custom domain.
+   `odivon-school-admin.web.app` (ve özel alan adı kullanacaksanız örn. `admin.school.odivon.com`).
+4. **Özel alan adı (isteğe bağlı):** Hosting → `odivon-school-admin` sitesi → Add custom domain.
 5. **Otomatik deploy (isteğe bağlı):** GitHub OIDC havuzu (`github-actions`) şu an ana repoya
    izin veriyor. Bu repoyu da ekleyin (provider'ın attribute condition'ına
    `dogangsn/OdivonSchoolAdmin`, servis hesabına `roles/iam.workloadIdentityUser`), sonra

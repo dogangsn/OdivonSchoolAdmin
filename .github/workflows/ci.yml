@@ -23,7 +23,7 @@ jobs:
           path: dist/OdivonSchoolAdmin/browser
           retention-days: 3
 
-  # Deploys to the Firebase Hosting site "odivonschool-admin" in the same
+  # Deploys to the Firebase Hosting site "odivon-school-admin" in the same
   # project as the main app. Turned on by the repo variable DEPLOY_ENABLED=true
   # once this repository is allowed in the GitHub OIDC (workload identity) pool.
   deploy:

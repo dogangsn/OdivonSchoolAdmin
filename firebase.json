@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "odivonschool-admin",
+    "site": "odivon-school-admin",
     "public": "dist/OdivonSchoolAdmin/browser",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [{ "source": "**", "destination": "/index.html" }],
