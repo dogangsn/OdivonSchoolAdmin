@@ -1,0 +1,136 @@
+<app-page-header title="Kullanıcılar" [subtitle]="data.users.data().length + ' hesap · filtreye uyan ' + filtered().length">
+  <button class="btn-ghost" (click)="data.users.load(true)" [disabled]="data.users.loading()">
+    <app-icon name="refresh" size="w-4 h-4" [class.animate-spin]="data.users.loading()" /> Yenile
+  </button>
+  <button class="btn-primary" (click)="exportCsv()"><app-icon name="download" size="w-4 h-4" /> CSV indir</button>
+</app-page-header>
+
+<div class="card p-4 mb-5">
+  <div class="flex flex-col xl:flex-row gap-3">
+    <div class="relative flex-1">
+      <app-icon name="search" size="w-4 h-4" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      <input class="input !pl-10" placeholder="Ara: isim, e-posta, okul, kullanıcı adı, UID" [value]="q()" (input)="set(q, $any($event.target).value)" />
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+      <select class="input !py-2" [value]="role()" (change)="set(role, $any($event.target).value)">
+        <option value="all">Tüm roller</option>
+        <option value="student">Öğrenci</option>
+        <option value="teacher">Öğretmen</option>
+        <option value="admin">Yönetici</option>
+      </select>
+      <select class="input !py-2" [value]="status()" (change)="set(status, $any($event.target).value)">
+        <option value="all">Tüm durumlar</option>
+        <option value="active">Aktif</option>
+        <option value="trial">Deneme</option>
+        <option value="expired">Süresi doldu</option>
+        <option value="none">Abonelik yok</option>
+        <option value="suspended">Askıda</option>
+      </select>
+      <select class="input !py-2" [value]="plan()" (change)="set(plan, $any($event.target).value)">
+        <option value="all">Tüm planlar</option>
+        <option value="free">Ücretsiz</option>
+        <option value="pro">Pro</option>
+        <option value="vip">VIP</option>
+      </select>
+      <select class="input !py-2" [value]="level()" (change)="set(level, $any($event.target).value)">
+        <option value="all">Tüm kademeler</option>
+        <option value="ilkokul">İlkokul</option>
+        <option value="ortaokul">Ortaokul</option>
+        <option value="lise">Lise</option>
+        <option value="kpss">KPSS</option>
+      </select>
+      <select class="input !py-2" [value]="activity()" (change)="set(activity, $any($event.target).value)">
+        <option value="all">Her aktivite</option>
+        <option value="1">Bugün aktif</option>
+        <option value="7">7 günde aktif</option>
+        <option value="30">30 günde aktif</option>
+        <option value="never">Hiç görülmedi</option>
+      </select>
+    </div>
+    <button class="btn-ghost" (click)="clear()">Temizle</button>
+  </div>
+</div>
+
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto custom-scroll">
+    <table class="data">
+      <thead>
+        <tr>
+          <th><button class="cursor-pointer uppercase" (click)="sortBy('name')">Kullanıcı {{ sort() === 'name' ? (dir() === 1 ? '↑' : '↓') : '' }}</button></th>
+          <th>Rol / Sınıf</th>
+          <th>Plan</th>
+          <th><button class="cursor-pointer uppercase" (click)="sortBy('expires')">Bitiş {{ sort() === 'expires' ? (dir() === 1 ? '↑' : '↓') : '' }}</button></th>
+          <th><button class="cursor-pointer uppercase" (click)="sortBy('xp')">XP {{ sort() === 'xp' ? (dir() === 1 ? '↑' : '↓') : '' }}</button></th>
+          <th><button class="cursor-pointer uppercase" (click)="sortBy('lastSeenAt')">Son görülme {{ sort() === 'lastSeenAt' ? (dir() === 1 ? '↑' : '↓') : '' }}</button></th>
+          <th><button class="cursor-pointer uppercase" (click)="sortBy('createdAt')">Kayıt {{ sort() === 'createdAt' ? (dir() === 1 ? '↑' : '↓') : '' }}</button></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (data.users.loading() && !data.users.at()) {
+          @for (i of [1, 2, 3, 4, 5, 6]; track i) {
+            <tr><td colspan="8"><div class="skeleton h-8"></div></td></tr>
+          }
+        }
+        @for (u of rows(); track u.uid) {
+          <tr>
+            <td>
+              <a [routerLink]="['/kullanicilar', u.uid]" class="flex items-center gap-3 min-w-[220px]">
+                <app-avatar [name]="u.displayName || u.email" [size]="36" />
+                <div class="min-w-0">
+                  <div class="font-bold text-slate-900 dark:text-white truncate">{{ u.displayName || '—' }}</div>
+                  <div class="text-xs text-slate-500 truncate">{{ isStudentAccountEmail(u.email) ? '@' + (u.username || 'öğretmen hesabı') : u.email }}</div>
+                </div>
+              </a>
+            </td>
+            <td class="whitespace-nowrap">
+              <div class="text-xs font-bold text-slate-700 dark:text-slate-200">{{ roleLabel(u.role) }}</div>
+              <div class="text-[11px] text-slate-500">
+                @if (u.role === 'teacher') { {{ u.school || 'Okul yok' }} } @else { {{ u.grade ? u.grade + '. sınıf' : (u.gradeLevel ? levelLabels[u.gradeLevel] : '—') }} }
+              </div>
+            </td>
+            <td class="whitespace-nowrap">
+              <div class="flex flex-col items-start gap-1">
+                <span class="text-xs font-bold text-slate-700 dark:text-slate-200">{{ plans[effectivePlan(u)].label }}</span>
+                <app-badge [tone]="statusTone(u)">{{ u.suspended ? 'Askıda' : statusLabels[effectiveStatus(u)] }}</app-badge>
+              </div>
+            </td>
+            <td class="whitespace-nowrap text-xs">
+              @if (u.subscriptionExpiresAt) {
+                <div class="font-semibold">{{ fmtDate(u.subscriptionExpiresAt) }}</div>
+                @if (daysLeft(u); as d) {
+                  <div class="text-[11px]" [class]="d < 0 ? 'text-rose-500' : d <= 3 ? 'text-amber-600' : 'text-slate-400'">{{ d < 0 ? (-d) + ' gün geçti' : d + ' gün kaldı' }}</div>
+                }
+              } @else {
+                <span class="text-slate-400">—</span>
+              }
+            </td>
+            <td class="text-xs font-bold whitespace-nowrap">{{ u.xp ?? 0 }} @if (u.streakDays) {<span class="text-amber-600 font-semibold">· 🔥{{ u.streakDays }}</span>}</td>
+            <td class="text-xs whitespace-nowrap">
+              <span class="inline-flex items-center gap-1.5">
+                @if (u.lastSeenAt && now() - u.lastSeenAt < 86400000) { <span class="w-2 h-2 rounded-full bg-emerald-500"></span> }
+                {{ ago(u.lastSeenAt) }}
+              </span>
+            </td>
+            <td class="text-xs whitespace-nowrap text-slate-500">{{ fmtDate(u.createdAt) }}</td>
+            <td class="text-right">
+              <a [routerLink]="['/kullanicilar', u.uid]" class="btn-ghost btn-sm">Detay</a>
+            </td>
+          </tr>
+        } @empty {
+          @if (!data.users.loading()) {
+            <tr><td colspan="8"><app-empty icon="users" title="Kullanıcı bulunamadı" text="Filtreleri değiştirmeyi deneyin." /></td></tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+  <div class="flex items-center justify-between px-4 py-3 text-xs font-semibold text-slate-500">
+    <span>{{ filtered().length ? page() * pageSize + 1 : 0 }}–{{ Math.min((page() + 1) * pageSize, filtered().length) }} / {{ filtered().length }}</span>
+    <div class="flex items-center gap-2">
+      <button class="btn-ghost btn-sm" [disabled]="page() === 0" (click)="page.set(page() - 1)"><app-icon name="chevronLeft" size="w-3.5 h-3.5" /></button>
+      <span>{{ page() + 1 }} / {{ pages() }}</span>
+      <button class="btn-ghost btn-sm" [disabled]="page() >= pages() - 1" (click)="page.set(page() + 1)"><app-icon name="chevronRight" size="w-3.5 h-3.5" /></button>
+    </div>
+  </div>
+</div>

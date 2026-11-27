@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: admin-dist
+          path: dist/OdivonSchoolAdmin/browser
+          retention-days: 3
+
+  # Deploys to the Firebase Hosting site "odivonschool-admin" in the same
+  # project as the main app. Turned on by the repo variable DEPLOY_ENABLED=true
+  # once this repository is allowed in the GitHub OIDC (workload identity) pool.
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: firebase-admin-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: admin-dist
+          path: dist/OdivonSchoolAdmin/browser
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/85105551551/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: github-deploy@odivonschool.iam.gserviceaccount.com
+      - name: Deploy hosting
+        run: npx -y firebase-tools@13 deploy --only hosting --project odivonschool --non-interactive --force

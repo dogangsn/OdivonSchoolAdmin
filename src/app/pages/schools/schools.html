@@ -1,0 +1,175 @@
+<app-page-header title="Okullar ve Sınıflar" subtitle="Öğretmenlerin okulları, açtıkları sınıflar ve öğrenci sayıları">
+  <button class="btn-ghost" (click)="refresh()" [disabled]="countingMembers() || data.classes.loading()">
+    <app-icon name="refresh" size="w-4 h-4" [class.animate-spin]="countingMembers() || data.classes.loading()" /> Yenile
+  </button>
+  <button class="btn-primary" (click)="exportCsv()"><app-icon name="download" size="w-4 h-4" /> CSV indir</button>
+</app-page-header>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+  <app-kpi label="Okul" [value]="namedSchools()" icon="school" tone="indigo" hint="Öğretmen profillerindeki okul adına göre" />
+  <app-kpi label="Öğretmen" [value]="teachers().length" icon="users" tone="emerald" [hint]="pending() + ' onay bekliyor'" />
+  <app-kpi label="Sınıf" [value]="classes().length" icon="book" tone="sky" hint="Arşivlenmemiş sınıflar" />
+  <app-kpi label="Sınıftaki öğrenci" [value]="countingMembers() ? '…' : totalStudents()" icon="sparkles" tone="purple" hint="Sınıf üyeliklerinin toplamı" />
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+  <div class="card p-6">
+    <div class="card-title">Sınıf seviyeleri</div>
+    <div class="card-sub mb-5">Açılan sınıfların seviyesi</div>
+    <app-hbars [data]="gradeDist()" color="#0ea5e9" />
+  </div>
+  <div class="card p-6">
+    <div class="card-title">Branşlar</div>
+    <div class="card-sub mb-5">Öğretmenlerin branşı</div>
+    <app-hbars [data]="branches()" color="#10b981" />
+  </div>
+</div>
+
+<div class="card mt-5 overflow-hidden">
+  <div class="p-4 flex flex-col lg:flex-row lg:items-center gap-3 border-b border-slate-100 dark:border-slate-800">
+    <div class="seg">
+      <button [class.on]="tab() === 'schools'" (click)="tab.set('schools')">Okullar ({{ schools().length }})</button>
+      <button [class.on]="tab() === 'teachers'" (click)="tab.set('teachers')">Öğretmenler ({{ teachers().length }})</button>
+      <button [class.on]="tab() === 'classes'" (click)="tab.set('classes')">Sınıflar ({{ classes().length }})</button>
+    </div>
+    <div class="relative flex-1">
+      <app-icon name="search" size="w-4 h-4" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      <input class="input !pl-10" placeholder="Okul, öğretmen, sınıf, katılım kodu" [value]="q()" (input)="q.set($any($event.target).value)" />
+    </div>
+    @if (tab() === 'teachers') {
+      <select class="input lg:!w-48" [value]="teacherFilter()" (change)="teacherFilter.set($any($event.target).value)">
+        <option value="all">Tümü</option>
+        <option value="pending">Onay bekleyen</option>
+        <option value="verified">Onaylı</option>
+      </select>
+    }
+  </div>
+
+  @switch (tab()) {
+    @case ('schools') {
+      <div class="overflow-x-auto custom-scroll">
+        <table class="data">
+          <thead><tr><th>Okul</th><th>Öğretmen</th><th>Sınıf</th><th>Öğrenci</th><th>Son öğretmen girişi</th><th></th></tr></thead>
+          <tbody>
+            @for (s of schools(); track s.key) {
+              <tr class="cursor-pointer" (click)="openSchool.set(openSchool() === s.key ? null : s.key)">
+                <td>
+                  <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 flex items-center justify-center"><app-icon name="school" size="w-4.5 h-4.5" /></div>
+                    <span class="font-bold text-slate-900 dark:text-white">{{ s.name }}</span>
+                  </div>
+                </td>
+                <td class="text-xs"><b>{{ s.teachers.length }}</b> <span class="text-slate-400">({{ s.verified }} onaylı)</span></td>
+                <td class="font-bold">{{ s.classes.length }}</td>
+                <td class="font-bold">{{ countingMembers() ? '…' : s.students }}</td>
+                <td class="text-xs">{{ ago(s.lastSeen || null) }}</td>
+                <td class="text-right"><app-icon [name]="openSchool() === s.key ? 'arrowUp' : 'chevronRight'" size="w-4 h-4" class="text-slate-400" /></td>
+              </tr>
+              @if (openSchool() === s.key) {
+                <tr class="!bg-slate-50/70 dark:!bg-slate-800/20">
+                  <td colspan="6">
+                    <div class="grid md:grid-cols-2 gap-4 py-2">
+                      <div>
+                        <div class="label">Öğretmenler</div>
+                        @for (t of s.teachers; track t.uid) {
+                          <a [routerLink]="['/kullanicilar', t.uid]" class="flex items-center gap-2 py-1.5 text-xs hover:text-indigo-600">
+                            <app-avatar [name]="t.displayName || t.email" [size]="24" />
+                            <b>{{ t.displayName || t.email }}</b> <span class="text-slate-400">{{ t.branch }}</span>
+                            <app-badge [tone]="t.teacherVerified ? 'emerald' : 'amber'">{{ t.teacherVerified ? 'Onaylı' : 'Bekliyor' }}</app-badge>
+                          </a>
+                        }
+                      </div>
+                      <div>
+                        <div class="label">Sınıflar</div>
+                        @for (c of s.classes; track c.id) {
+                          <div class="flex items-center justify-between py-1.5 text-xs">
+                            <span><b>{{ c.name }}</b> · {{ c.grade }}. sınıf · {{ c.teacherName }}</span>
+                            <span class="font-bold">{{ memberCounts()[c.id] ?? '…' }} öğrenci</span>
+                          </div>
+                        } @empty {
+                          <div class="text-xs text-slate-400">Sınıf açılmamış</div>
+                        }
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              }
+            } @empty {
+              <tr><td colspan="6"><app-empty icon="school" title="Okul yok" text="Öğretmenler kayıt olurken okul adı girdiğinde burada gruplanır." /></td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+    @case ('teachers') {
+      <div class="overflow-x-auto custom-scroll">
+        <table class="data">
+          <thead><tr><th>Öğretmen</th><th>Okul / Branş</th><th>Sınıf</th><th>Kayıt</th><th>Son görülme</th><th>Onay</th></tr></thead>
+          <tbody>
+            @for (r of teacherRows(); track r.t.uid) {
+              <tr>
+                <td>
+                  <a [routerLink]="['/kullanicilar', r.t.uid]" class="flex items-center gap-3 min-w-[200px]">
+                    <app-avatar [name]="r.t.displayName || r.t.email" [size]="32" />
+                    <div class="min-w-0">
+                      <div class="font-bold text-slate-900 dark:text-white truncate">{{ r.t.displayName || '—' }}</div>
+                      <div class="text-[11px] text-slate-500 truncate">{{ r.t.email }}</div>
+                    </div>
+                  </a>
+                </td>
+                <td class="text-xs">{{ r.t.school || '—' }}<div class="text-[11px] text-slate-400">{{ r.t.branch }}</div></td>
+                <td class="font-bold">{{ r.classCount }}</td>
+                <td class="text-xs">{{ fmtDate(r.t.createdAt) }}</td>
+                <td class="text-xs">{{ ago(r.t.lastSeenAt) }}</td>
+                <td>
+                  <button class="btn-sm" [class]="r.t.teacherVerified ? 'btn-ghost' : 'btn-success'" (click)="verify(r.t)">
+                    {{ r.t.teacherVerified ? 'Onaylı ✓' : 'Onayla' }}
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="6"><app-empty icon="users" title="Öğretmen yok" /></td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+    @case ('classes') {
+      <div class="overflow-x-auto custom-scroll">
+        <table class="data">
+          <thead><tr><th>Sınıf</th><th>Öğretmen</th><th>Seviye</th><th>Öğrenci</th><th>Katılım kodu</th><th>Açılış</th></tr></thead>
+          <tbody>
+            @for (c of classRows(); track c.id) {
+              <tr class="cursor-pointer" (click)="toggleClass(c)">
+                <td class="font-bold text-slate-900 dark:text-white">{{ c.name }}</td>
+                <td class="text-xs"><a [routerLink]="['/kullanicilar', c.teacherId]" (click)="$event.stopPropagation()" class="hover:text-indigo-600">{{ c.teacherName }}</a>
+                  <div class="text-[11px] text-slate-400">{{ userMap().get(c.teacherId)?.school }}</div></td>
+                <td class="text-xs">{{ c.grade }}. sınıf</td>
+                <td class="font-bold">{{ memberCounts()[c.id] ?? '…' }}</td>
+                <td><span class="font-mono text-xs px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800">{{ c.joinCode }}</span></td>
+                <td class="text-xs">{{ fmtDate(c.createdAt) }}</td>
+              </tr>
+              @if (openClass() === c.id) {
+                <tr class="!bg-slate-50/70 dark:!bg-slate-800/20">
+                  <td colspan="6">
+                    <div class="flex flex-wrap gap-2 py-1">
+                      @for (m of classMembers(); track m.uid) {
+                        <a [routerLink]="['/kullanicilar', m.uid]" class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:border-indigo-400">
+                          <app-avatar [name]="m.displayName" [size]="20" /> {{ m.displayName }}
+                        </a>
+                      } @empty {
+                        <span class="text-xs text-slate-400">Öğrenci yok ya da yükleniyor…</span>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            } @empty {
+              <tr><td colspan="6"><app-empty icon="book" title="Sınıf yok" /></td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</div>

@@ -1,0 +1,106 @@
+<div class="min-h-screen flex">
+  <!-- Sidebar -->
+  @if (mobileOpen()) {
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden" (click)="mobileOpen.set(false)"></div>
+  }
+  <aside
+    class="fixed inset-y-0 left-0 z-50 w-[264px] flex flex-col bg-white dark:bg-[#0f172a] border-r border-slate-200/80 dark:border-slate-800 transition-transform lg:translate-x-0"
+    [class.-translate-x-full]="!mobileOpen()"
+  >
+    <div class="h-16 px-5 flex items-center gap-3 border-b border-slate-100 dark:border-slate-800">
+      <img src="odivon-logo.svg" alt="" class="w-9 h-9 rounded-xl" />
+      <div class="leading-tight">
+        <div class="text-sm font-black text-slate-900 dark:text-white tracking-tight">Odivon School</div>
+        <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-500">Admin Console</div>
+      </div>
+      <button class="ml-auto lg:hidden text-slate-400 cursor-pointer" (click)="mobileOpen.set(false)"><app-icon name="x" /></button>
+    </div>
+
+    <nav class="flex-1 overflow-y-auto custom-scroll px-3 py-4 space-y-5">
+      @for (g of groups; track g.title) {
+        <div>
+          <div class="px-3 mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{{ g.title }}</div>
+          <ul class="space-y-0.5">
+            @for (i of g.items; track i.path) {
+              <li>
+                <a
+                  [routerLink]="i.path"
+                  routerLinkActive="!bg-indigo-50 !text-indigo-700 dark:!bg-indigo-950/50 dark:!text-indigo-300 nav-on"
+                  [routerLinkActiveOptions]="{ exact: !!i.exact }"
+                  class="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white transition-colors"
+                >
+                  <app-icon [name]="i.icon" />
+                  <span class="flex-1">{{ i.label }}</span>
+                  @if (i.badge && i.badge() > 0) {
+                    <span class="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center">{{ i.badge() }}</span>
+                  }
+                </a>
+              </li>
+            }
+          </ul>
+        </div>
+      }
+    </nav>
+
+    <div class="p-3 border-t border-slate-100 dark:border-slate-800">
+      <a [href]="appUrl" target="_blank" rel="noopener"
+        class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/60">
+        <app-icon name="external" />
+        <span>Uygulamaya git</span>
+      </a>
+      <div class="mt-2 flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+        <app-avatar [name]="auth.me()?.displayName || auth.me()?.email || ''" [size]="34" />
+        <div class="min-w-0 flex-1">
+          <div class="text-xs font-bold text-slate-900 dark:text-white truncate">{{ auth.me()?.displayName || 'Yönetici' }}</div>
+          <div class="text-[11px] text-slate-500 truncate">{{ auth.me()?.email }}</div>
+        </div>
+        <button class="w-8 h-8 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-white dark:hover:bg-slate-900 flex items-center justify-center cursor-pointer" title="Çıkış yap" (click)="logout()">
+          <app-icon name="logout" size="w-4.5 h-4.5" />
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="flex-1 min-w-0 lg:pl-[264px]">
+    <header class="sticky top-0 z-30 h-16 px-4 sm:px-6 flex items-center gap-3 bg-white/80 dark:bg-[#0b1120]/80 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800">
+      <button class="lg:hidden w-9 h-9 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center cursor-pointer" (click)="mobileOpen.set(true)">
+        <app-icon name="menu" />
+      </button>
+      <div class="hidden sm:block text-sm font-bold text-slate-900 dark:text-white">{{ pageTitle() }}</div>
+
+      <div class="relative ml-auto w-full max-w-sm">
+        <app-icon name="search" size="w-4 h-4" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input
+          class="w-full pl-9 pr-3 py-2 rounded-xl text-sm bg-slate-100/80 dark:bg-slate-800/70 border border-transparent focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 placeholder-slate-400"
+          placeholder="Kullanıcı ara (isim, e-posta, okul)…"
+          [value]="search()"
+          (input)="search.set($any($event.target).value); searchOpen.set(true)"
+          (focus)="searchOpen.set(true)"
+          (blur)="searchOpen.set(false)"
+        />
+        @if (searchOpen() && results().length) {
+          <div class="absolute top-full mt-2 left-0 right-0 card p-1.5 shadow-xl max-h-96 overflow-auto">
+            @for (u of results(); track u.uid) {
+              <button class="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-left cursor-pointer" (mousedown)="open(u)">
+                <app-avatar [name]="u.displayName || u.email" [size]="30" />
+                <div class="min-w-0">
+                  <div class="text-xs font-bold truncate text-slate-900 dark:text-white">{{ u.displayName || '—' }}</div>
+                  <div class="text-[11px] text-slate-500 truncate">{{ u.email }}</div>
+                </div>
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      <button class="w-9 h-9 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 flex items-center justify-center cursor-pointer" (click)="theme.toggle()" [title]="theme.dark() ? 'Açık tema' : 'Koyu tema'">
+        <app-icon [name]="theme.dark() ? 'sun' : 'moon'" />
+      </button>
+    </header>
+
+    <main class="p-4 sm:p-6 lg:p-8 max-w-[1500px] mx-auto">
+      <router-outlet />
+    </main>
+  </div>
+</div>

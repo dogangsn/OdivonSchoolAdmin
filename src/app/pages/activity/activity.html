@@ -1,0 +1,147 @@
+<app-page-header title="Aktivite ve Kullanım" [subtitle]="'Son ' + days() + ' günde öğrencilerin çözdüğü testler ve oynadığı oyunlar'">
+  <div class="seg">
+    @for (d of [7, 30, 90]; track d) {
+      <button [class.on]="days() === d" (click)="setDays(d)">{{ d }} gün</button>
+    }
+  </div>
+  <button class="btn-ghost" (click)="setDays(days())" [disabled]="loading()">
+    <app-icon name="refresh" size="w-4 h-4" [class.animate-spin]="loading()" /> Yenile
+  </button>
+</app-page-header>
+
+@if (data.attempts.error() || data.games.error()) {
+  <div class="mb-5 p-4 rounded-2xl border border-amber-200 bg-amber-50 text-amber-800 text-sm font-semibold dark:bg-amber-950/40 dark:border-amber-900 dark:text-amber-300">
+    Bazı veriler yüklenemedi: {{ data.attempts.error() || data.games.error() }}
+  </div>
+}
+
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+  <app-kpi label="Aktif öğrenen" [value]="activeLearners()" icon="users" tone="indigo" [hint]="'Bugün ' + dau() + ' · 7 günde ' + wau()" />
+  <app-kpi label="Çözülen soru" [value]="questions().toLocaleString('tr-TR')" icon="doc" tone="sky" [hint]="attempts().length + ' test · ortalama başarı %' + avgSuccess()" />
+  <app-kpi label="Oynanan oyun" [value]="games().length" icon="game" tone="amber" [hint]="assignmentsDone() + ' tanesi öğretmen ödevi'" />
+  <app-kpi label="Çalışma süresi" [value]="studyHours() + ' sa'" icon="clock" tone="emerald" [hint]="'Yapışkanlık (DAU/MAU) %' + stickiness()" />
+</div>
+
+<div class="card p-6 mt-5">
+  <div class="flex flex-wrap items-start justify-between gap-4 mb-5">
+    <div>
+      <div class="card-title">Günlük aktif öğrenen</div>
+      <div class="card-sub">O gün en az bir test ya da oyun bitiren tekil kullanıcı</div>
+    </div>
+  </div>
+  <app-line-chart [data]="dailyLearners()" [height]="190" color="#6366f1" label1="Öğrenen" />
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-5 mt-5">
+  <div class="card p-6">
+    <div class="card-title">Testler</div>
+    <div class="card-sub mb-5">Günlük bitirilen test</div>
+    <app-bar-chart [data]="daily()" color="#0ea5e9" />
+  </div>
+  <div class="card p-6">
+    <div class="card-title">Oyunlar</div>
+    <div class="card-sub mb-5">Günlük oynanan oyun</div>
+    <app-bar-chart [data]="dailyGames()" color="#f59e0b" />
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mt-5">
+  <div class="card p-6">
+    <div class="card-title">Derse göre başarı</div>
+    <div class="card-sub mb-5">En çok çözülen 10 ders, doğru oranı</div>
+    <app-hbars [data]="subjectSuccess()" unit="%" [scale]="100" color="#10b981" />
+  </div>
+  <div class="card p-6">
+    <div class="card-title">Kademeye göre test</div>
+    <div class="card-sub mb-5">Test sayısı</div>
+    <app-hbars [data]="levelTests()" color="#0ea5e9" />
+  </div>
+  <div class="card p-6">
+    <div class="card-title">Oyun türleri</div>
+    <div class="card-sub mb-5">Oynanma sayısı</div>
+    <app-hbars [data]="gameTypes()" color="#f59e0b" />
+  </div>
+</div>
+
+<div class="card p-6 mt-5">
+  <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
+    <div>
+      <div class="card-title">Kullanım saatleri</div>
+      <div class="card-sub">Haftanın günü × saat (test + oyun){{ peakHour() !== null ? ' · en yoğun saat ' + peakHour() + ':00' : '' }}</div>
+    </div>
+  </div>
+  <div class="overflow-x-auto custom-scroll">
+    <div class="min-w-[640px]">
+      <div class="grid gap-1" style="grid-template-columns: 40px repeat(24, minmax(0, 1fr))">
+        <div></div>
+        @for (h of hours; track h) {
+          <div class="text-[9px] font-bold text-slate-400 text-center">{{ h % 3 === 0 ? h : '' }}</div>
+        }
+        @for (row of heat().grid; track $index; let d = $index) {
+          <div class="text-[10px] font-bold text-slate-500 flex items-center">{{ daysTr[d] }}</div>
+          @for (v of row; track $index; let h = $index) {
+            <div class="h-6 rounded-md bg-slate-100 dark:bg-slate-800/60 relative" [title]="daysTr[d] + ' ' + h + ':00 · ' + v">
+              <div class="absolute inset-0 rounded-md" [style.background]="heatColor(v)"></div>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-5 mt-5">
+  <div class="card overflow-hidden xl:col-span-2">
+    <div class="p-5 pb-3">
+      <div class="card-title">En aktif kullanıcılar</div>
+      <div class="card-sub">Son {{ days() }} gün</div>
+    </div>
+    <div class="overflow-x-auto custom-scroll">
+      <table class="data">
+        <thead><tr><th>#</th><th>Kullanıcı</th><th>Test</th><th>Oyun</th><th>Soru</th><th>Başarı</th><th>XP</th></tr></thead>
+        <tbody>
+          @for (l of leaders(); track l.uid; let i = $index) {
+            <tr>
+              <td class="font-black text-slate-400">{{ i + 1 }}</td>
+              <td>
+                <a [routerLink]="['/kullanicilar', l.uid]" class="flex items-center gap-3">
+                  <app-avatar [name]="name(l.user, l.uid)" [size]="30" />
+                  <div class="min-w-0">
+                    <div class="font-bold text-slate-900 dark:text-white truncate">{{ name(l.user, l.uid) }}</div>
+                    <div class="text-[11px] text-slate-500">{{ l.user?.grade ? l.user!.grade + '. sınıf' : '' }}</div>
+                  </div>
+                </a>
+              </td>
+              <td class="font-bold">{{ l.tests }}</td>
+              <td class="font-bold">{{ l.games }}</td>
+              <td class="text-xs">{{ l.q }}</td>
+              <td class="text-xs font-bold">{{ l.rate === null ? '—' : '%' + l.rate }}</td>
+              <td class="text-xs">{{ l.user?.xp ?? 0 }}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="7"><app-empty icon="pulse" title="Bu aralıkta aktivite yok" /></td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card p-5">
+    <div class="card-title">Kaybedilme riski</div>
+    <div class="card-sub mb-4">14+ gündür girmeyen öğrenciler</div>
+    <ul class="space-y-1 -mx-2">
+      @for (u of atRisk(); track u.uid) {
+        <li>
+          <a [routerLink]="['/kullanicilar', u.uid]" class="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50">
+            <app-avatar [name]="u.displayName || u.email" [size]="30" />
+            <div class="min-w-0 flex-1">
+              <div class="text-xs font-bold truncate text-slate-900 dark:text-white">{{ u.displayName || u.email }}</div>
+              <div class="text-[11px] text-slate-500">Son görülme {{ ago(u.lastSeenAt) }}</div>
+            </div>
+          </a>
+        </li>
+      } @empty {
+        <li class="text-xs text-slate-400 text-center py-6">Risk listesi boş</li>
+      }
+    </ul>
+  </div>
+</div>

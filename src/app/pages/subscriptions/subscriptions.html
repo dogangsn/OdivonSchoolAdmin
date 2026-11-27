@@ -1,0 +1,77 @@
+<app-page-header title="Abonelikler" subtitle="Gelir, yenilemeler ve abone tabanı">
+  <button class="btn-ghost" (click)="data.users.load(true)" [disabled]="data.users.loading()">
+    <app-icon name="refresh" size="w-4 h-4" [class.animate-spin]="data.users.loading()" /> Yenile
+  </button>
+</app-page-header>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+  <app-kpi label="MRR" [value]="tl(m().mrr)" icon="money" tone="purple" [hint]="'Yıllık (ARR) ' + tl(arr())" />
+  <app-kpi label="Ödeyen abone" [value]="m().paying" icon="card" tone="emerald" [hint]="'Abone başına ' + tl(arpu()) + ' / ay'" />
+  <app-kpi label="Denemede" [value]="m().trials" icon="clock" tone="amber" [hint]="m().trialsEndingSoon.length + ' tanesi 3 gün içinde bitiyor'" />
+  <app-kpi label="Kayıp (30g)" [value]="'%' + churn30()" icon="arrowDown" tone="rose" [hint]="m().lapsed.length + ' süresi geçmiş, yenilenmedi'" />
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mt-5">
+  <div class="card p-6">
+    <div class="card-title">Plana göre MRR</div>
+    <div class="card-sub mb-5">₺ / ay</div>
+    <app-donut [segments]="mrrByPlan()" caption="₺ / ay" />
+  </div>
+  <div class="card p-6">
+    <div class="card-title">Dönem</div>
+    <div class="card-sub mb-5">Aktif abonelerin ödeme dönemi</div>
+    <app-donut [segments]="periods()" caption="Abone" />
+  </div>
+  <div class="card p-6">
+    <div class="card-title">Kaynak</div>
+    <div class="card-sub mb-5">Abonelik nereden geldi</div>
+    <app-hbars [data]="sources()" color="#6366f1" />
+  </div>
+</div>
+
+<div class="card mt-5 overflow-hidden">
+  <div class="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800">
+    <div class="seg">
+      <button [class.on]="view() === 'renewals'" (click)="view.set('renewals')">Yenileme takvimi ({{ renewals().length }})</button>
+      <button [class.on]="view() === 'active'" (click)="view.set('active')">Aktif ({{ active().length }})</button>
+      <button [class.on]="view() === 'trial'" (click)="view.set('trial')">Deneme ({{ trial().length }})</button>
+      <button [class.on]="view() === 'expired'" (click)="view.set('expired')">Süresi dolan ({{ expired().length }})</button>
+    </div>
+    @if (view() === 'renewals') {
+      <span class="text-xs text-slate-500 font-semibold">Son 7 gün içinde biten ve önümüzdeki 30 günde bitecek abonelikler</span>
+    }
+  </div>
+  <div class="overflow-x-auto custom-scroll">
+    <table class="data">
+      <thead><tr><th>Abone</th><th>Plan</th><th>Dönem</th><th>Başlangıç</th><th>Bitiş</th><th>Kalan</th><th>Aylık katkı</th><th>Kaynak</th></tr></thead>
+      <tbody>
+        @for (u of rows(); track u.uid) {
+          <tr>
+            <td>
+              <a [routerLink]="['/kullanicilar', u.uid]" class="flex items-center gap-3 min-w-[200px]">
+                <app-avatar [name]="name(u)" [size]="32" />
+                <div class="min-w-0">
+                  <div class="font-bold text-slate-900 dark:text-white truncate">{{ name(u) }}</div>
+                  <div class="text-[11px] text-slate-500 truncate">{{ u.email }}</div>
+                </div>
+              </a>
+            </td>
+            <td><app-badge [tone]="tone(u)">{{ plans[u.subscriptionPlan && u.subscriptionPlan !== 'free' ? u.subscriptionPlan : 'pro'].label }}</app-badge></td>
+            <td class="text-xs">{{ u.subscriptionPeriod === 'yearly' ? 'Yıllık' : 'Aylık' }}</td>
+            <td class="text-xs">{{ fmtDate(u.subscriptionStartedAt) }}</td>
+            <td class="text-xs font-semibold">{{ fmtDate(u.subscriptionExpiresAt) }}</td>
+            <td class="text-xs font-bold">
+              @if (daysLeft(u); as d) {
+                <span [class]="d < 0 ? 'text-rose-600' : d <= 7 ? 'text-amber-600' : 'text-emerald-600'">{{ d < 0 ? (-d) + ' gün geçti' : d + ' gün' }}</span>
+              } @else { <span class="text-amber-600">bugün</span> }
+            </td>
+            <td class="font-bold text-xs">{{ tl(monthlyRevenue(u)) }}</td>
+            <td class="text-xs text-slate-500">{{ u.subscriptionSource || 'manual' }}</td>
+          </tr>
+        } @empty {
+          <tr><td colspan="8"><app-empty icon="card" title="Bu listede abone yok" /></td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

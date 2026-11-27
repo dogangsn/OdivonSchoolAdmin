@@ -1,0 +1,86 @@
+<app-page-header title="Ödemeler" subtitle="PayTR siparişleri ve tahsilat">
+  <label class="inline-flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 mr-2 cursor-pointer">
+    <input type="checkbox" class="accent-indigo-600" [checked]="includeTest()" (change)="includeTest.set($any($event.target).checked)" /> Test ödemelerini dahil et
+  </label>
+  <button class="btn-ghost" (click)="data.payments.load(true)" [disabled]="data.payments.loading()">
+    <app-icon name="refresh" size="w-4 h-4" [class.animate-spin]="data.payments.loading()" /> Yenile
+  </button>
+  <button class="btn-primary" (click)="exportCsv()"><app-icon name="download" size="w-4 h-4" /> CSV indir</button>
+</app-page-header>
+
+@if (data.payments.error()) {
+  <div class="mb-5 p-4 rounded-2xl border border-rose-200 bg-rose-50 text-rose-700 text-sm font-semibold dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-300">{{ data.payments.error() }}</div>
+}
+
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+  <app-kpi label="Toplam tahsilat" [value]="tl(total())" icon="money" tone="purple" [hint]="success().length + ' başarılı ödeme'" />
+  <app-kpi label="Bu ay" [value]="tl(month())" icon="receipt" tone="indigo" hint="Ayın başından bugüne" />
+  <app-kpi label="Başarı oranı" [value]="'%' + successRate()" icon="check" tone="emerald" hint="Sonuçlanan siparişlerde" />
+  <app-kpi label="Ortalama sepet" [value]="tl(avgOrder())" icon="card" tone="sky" [hint]="pendingOld() ? pendingOld() + ' sipariş 1 günden uzun bekliyor' : 'Bekleyen eski sipariş yok'" />
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-5 mt-5">
+  <div class="card p-6 xl:col-span-2">
+    <div class="flex items-start justify-between mb-5">
+      <div>
+        <div class="card-title">Tahsilat</div>
+        <div class="card-sub">{{ range() === 'daily' ? 'Son 30 gün, günlük' : 'Son 12 ay, aylık' }} (₺)</div>
+      </div>
+      <div class="seg">
+        <button [class.on]="range() === 'daily'" (click)="range.set('daily')">Günlük</button>
+        <button [class.on]="range() === 'monthly'" (click)="range.set('monthly')">Aylık</button>
+      </div>
+    </div>
+    <app-bar-chart [data]="range() === 'daily' ? daily() : monthly()" color="#8b5cf6" unit="₺" [height]="190" />
+  </div>
+  <div class="card p-6">
+    <div class="card-title">Paket</div>
+    <div class="card-sub mb-4">Başarılı ödemeler</div>
+    <app-donut [segments]="byPlan()" caption="Ödeme" [size]="110" />
+    <div class="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
+      <div class="card-title !text-sm mb-3">Durum</div>
+      <app-donut [segments]="byStatus()" caption="Sipariş" [size]="96" />
+    </div>
+  </div>
+</div>
+
+<div class="card mt-5 overflow-hidden">
+  <div class="p-4 flex flex-col sm:flex-row gap-3 border-b border-slate-100 dark:border-slate-800">
+    <div class="relative flex-1">
+      <app-icon name="search" size="w-4 h-4" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      <input class="input !pl-10" placeholder="E-posta, sipariş no, UID" [value]="q()" (input)="q.set($any($event.target).value)" />
+    </div>
+    <select class="input sm:!w-52" [value]="status()" (change)="status.set($any($event.target).value)">
+      <option value="all">Tüm durumlar</option>
+      <option value="success">Başarılı</option>
+      <option value="pending">Bekliyor</option>
+      <option value="failed_final">Başarısız</option>
+      <option value="failed">Başlatılamadı</option>
+      <option value="amount_mismatch">Tutar uyuşmadı</option>
+    </select>
+  </div>
+  <div class="overflow-x-auto custom-scroll">
+    <table class="data">
+      <thead><tr><th>Tarih</th><th>Müşteri</th><th>Paket</th><th>Tutar</th><th>Durum</th><th>Ödeme tipi</th><th>Sipariş no</th></tr></thead>
+      <tbody>
+        @for (p of rows().slice(0, 300); track p.id) {
+          <tr>
+            <td class="text-xs whitespace-nowrap">{{ fmtDateTime(p.createdAt) }}<div class="text-[11px] text-slate-400">{{ ago(p.createdAt) }}</div></td>
+            <td><a [routerLink]="['/kullanicilar', p.uid]" class="font-semibold text-slate-900 dark:text-white hover:text-indigo-600">{{ p.email }}</a></td>
+            <td class="text-xs whitespace-nowrap">{{ plans[p.plan]?.label }} · {{ p.period === 'yearly' ? 'Yıllık' : 'Aylık' }}</td>
+            <td class="font-black whitespace-nowrap">{{ tl(amount(p)) }}</td>
+            <td>
+              <app-badge [tone]="tone(p.status)">{{ labels[p.status] }}</app-badge>
+              @if (p.testMode) { <app-badge tone="slate">test</app-badge> }
+              @if (p.failedReason) { <div class="text-[11px] text-rose-500 mt-1">{{ p.failedReason }}</div> }
+            </td>
+            <td class="text-xs">{{ p.paymentType || '—' }}</td>
+            <td class="text-[11px] font-mono text-slate-500">{{ p.id }}</td>
+          </tr>
+        } @empty {
+          <tr><td colspan="7"><app-empty icon="receipt" title="Ödeme kaydı yok" text="PayTR canlıya alındığında siparişler burada listelenir." /></td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

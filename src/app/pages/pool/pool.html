@@ -1,0 +1,150 @@
+<app-page-header title="Soru Havuzu" [subtitle]="data.categories.data().length + ' konu · her konu için hedef ' + target + ' onaylı soru'">
+  @if (data.poolStatsCache(); as c) {
+    <span class="text-xs font-semibold text-slate-400">Sayım: {{ ago(c.at) }}</span>
+  }
+  <button class="btn-ghost" (click)="exportCsv()" [disabled]="!data.poolStatsCache()"><app-icon name="download" size="w-4 h-4" /> CSV</button>
+  <button class="btn-primary" (click)="count()" [disabled]="counting()">
+    <app-icon name="refresh" size="w-4 h-4" [class.animate-spin]="counting()" /> {{ counting() ? 'Sayılıyor…' : (data.poolStatsCache() ? 'Yeniden say' : 'Konuları say') }}
+  </button>
+</app-page-header>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+  <app-kpi label="Onaylı soru" [value]="totals()?.approved ?? '…'" icon="check" tone="emerald" hint="Testlerde kullanılan" />
+  <app-kpi label="Onay bekleyen" [value]="totals()?.draft ?? '…'" icon="clock" tone="amber" [hint]="(totals()?.teacherDrafts ?? 0) + ' tanesi öğretmen önerisi'" />
+  <app-kpi label="Hazır konu" [value]="data.poolStatsCache() ? readyCount() + ' / ' + data.categories.data().length : '—'" icon="book" tone="indigo" [hint]="'En az ' + target + ' onaylı sorusu olan'" />
+  <app-kpi label="Boş konu" [value]="data.poolStatsCache() ? emptyCount() : '—'" icon="warning" tone="rose" [hint]="'Reddedilen soru: ' + (totals()?.rejected ?? '…')" />
+</div>
+
+@if (!data.poolStatsCache()) {
+  <div class="card p-5 mt-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+    <div class="w-11 h-11 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 flex items-center justify-center"><app-icon name="sparkles" /></div>
+    <div class="flex-1">
+      <div class="font-bold text-slate-900 dark:text-white">Konu bazında sayım henüz yapılmadı</div>
+      <div class="text-xs text-slate-500">Her konu için onaylı ve taslak sayısı sunucuda sayılır (1000 soru başına 1 okuma). Birkaç saniye sürer.</div>
+    </div>
+    <button class="btn-primary" (click)="count()" [disabled]="counting()">{{ counting() ? 'Sayılıyor…' : 'Konuları say' }}</button>
+  </div>
+} @else {
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-5 mt-5">
+    @for (c of coverage(); track c.level) {
+      <button class="card p-5 text-left hover:shadow-md transition-all cursor-pointer" [class.ring-2]="level() === c.level" [class.ring-indigo-500]="level() === c.level"
+        (click)="level.set(level() === c.level ? 'all' : c.level); subject.set('all')">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">{{ levelLabels[c.level] }}</span>
+          <span class="text-xs font-black" [class]="c.pct >= 80 ? 'text-emerald-600' : c.pct >= 40 ? 'text-amber-600' : 'text-rose-600'">%{{ c.pct }}</span>
+        </div>
+        <div class="text-2xl font-black text-slate-900 dark:text-white mt-2">{{ c.ready }}<span class="text-sm text-slate-400 font-bold"> / {{ c.total }} konu</span></div>
+        <div class="h-2 rounded-full bg-slate-100 dark:bg-slate-800 mt-3 overflow-hidden">
+          <div class="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500" [style.width.%]="c.pct"></div>
+        </div>
+        <div class="text-[11px] text-slate-500 font-semibold mt-2">{{ c.approved }} onaylı soru</div>
+      </button>
+    }
+  </div>
+}
+
+<div class="card mt-5 overflow-hidden">
+  <div class="p-4 flex flex-col lg:flex-row gap-3 border-b border-slate-100 dark:border-slate-800">
+    <div class="relative flex-1">
+      <app-icon name="search" size="w-4 h-4" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      <input class="input !pl-10" placeholder="Konu, ders ya da ID ara" [value]="q()" (input)="q.set($any($event.target).value)" />
+    </div>
+    <select class="input lg:!w-40" [value]="level()" (change)="level.set($any($event.target).value); subject.set('all')">
+      <option value="all">Tüm kademeler</option>
+      @for (l of levels; track l) { <option [value]="l">{{ levelLabels[l] }}</option> }
+    </select>
+    <select class="input lg:!w-48" [value]="subject()" (change)="subject.set($any($event.target).value)">
+      <option value="all">Tüm dersler</option>
+      @for (s of subjects(); track s) { <option [value]="s">{{ s }}</option> }
+    </select>
+    <select class="input lg:!w-48" [value]="only()" (change)="only.set($any($event.target).value)">
+      <option value="all">Tüm konular</option>
+      <option value="short">Hedefin altında</option>
+      <option value="empty">Hiç sorusu yok</option>
+      <option value="drafts">Taslağı olan</option>
+    </select>
+  </div>
+  <div class="overflow-x-auto custom-scroll max-h-[640px]">
+    <table class="data">
+      <thead class="sticky top-0 z-10"><tr><th>Konu</th><th>Ders</th><th>Kademe / Sınıf</th><th class="w-56">Onaylı</th><th>Taslak</th><th></th></tr></thead>
+      <tbody>
+        @for (r of filtered(); track r.cat.id) {
+          <tr>
+            <td class="font-semibold text-slate-900 dark:text-white min-w-[220px]">{{ r.cat.topic }}</td>
+            <td class="text-xs">{{ r.cat.subject }}</td>
+            <td class="text-xs whitespace-nowrap">{{ levelLabels[r.cat.level] }}{{ r.cat.grades?.length ? ' · ' + r.cat.grades!.join(', ') + '. sınıf' : '' }}</td>
+            <td>
+              @if (data.poolStatsCache()) {
+                <div class="flex items-center gap-2">
+                  <div class="h-2 flex-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                    <div class="h-full rounded-full" [class]="r.approved >= target ? 'bg-emerald-500' : r.approved > 0 ? 'bg-amber-500' : 'bg-rose-400'" [style.width.%]="Math.min(100, (r.approved / target) * 100)"></div>
+                  </div>
+                  <span class="text-xs font-black w-8 text-right">{{ r.approved }}</span>
+                </div>
+              } @else { <span class="text-slate-300">—</span> }
+            </td>
+            <td>
+              @if (r.draft) {
+                <a [routerLink]="['/onay']" [queryParams]="{ kategori: r.cat.id }"><app-badge tone="amber">{{ r.draft }} taslak</app-badge></a>
+              } @else { <span class="text-xs text-slate-300">0</span> }
+            </td>
+            <td class="text-right"><button class="btn-ghost btn-sm" (click)="openCat(r.cat)">Sorular</button></td>
+          </tr>
+        } @empty {
+          <tr><td colspan="6"><app-empty icon="book" title="Konu bulunamadı" /></td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+
+@if (open(); as cat) {
+  <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50" (click)="open.set(null)"></div>
+  <div class="drawer fixed inset-y-0 right-0 max-w-2xl w-full bg-white dark:bg-slate-900 shadow-2xl z-50 flex flex-col border-l border-slate-200 dark:border-slate-800">
+    <div class="p-6 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-4">
+      <div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-indigo-500">{{ levelLabels[cat.level] }} · {{ cat.subject }}</div>
+        <h3 class="text-lg font-black text-slate-900 dark:text-white mt-1">{{ cat.topic }}</h3>
+        <p class="text-xs text-slate-500 mt-0.5">{{ questions().length }} soru</p>
+      </div>
+      <button class="w-9 h-9 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 flex items-center justify-center cursor-pointer" (click)="open.set(null)"><app-icon name="x" /></button>
+    </div>
+    <div class="px-6 pt-4">
+      <div class="seg">
+        @for (f of [{ k: 'all', l: 'Tümü' }, { k: 'approved', l: 'Onaylı' }, { k: 'draft', l: 'Taslak' }, { k: 'rejected', l: 'Reddedilen' }]; track f.k) {
+          <button [class.on]="qFilter() === f.k" (click)="qFilter.set($any(f.k))">{{ f.l }}</button>
+        }
+      </div>
+    </div>
+    <div class="flex-1 overflow-y-auto p-6 space-y-3 custom-scroll">
+      @if (qLoading()) {
+        @for (i of [1, 2, 3]; track i) { <div class="skeleton h-28"></div> }
+      }
+      @for (q of visibleQuestions(); track q.id; let i = $index) {
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <app-badge [tone]="tone(q.reviewStatus)">{{ statusLabel(q.reviewStatus) }}</app-badge>
+            <app-badge tone="slate">{{ q.source === 'teacher' ? 'Öğretmen: ' + (q.authorName || '') : q.source === 'ai-generated' ? 'Yapay zekâ' : 'Elle' }}</app-badge>
+            <span class="text-[11px] text-slate-400 ml-auto">Zorluk {{ q.difficulty }} · {{ q.usageCount || 0 }} kez · %{{ q.usageCount ? Math.round(((q.correctCount || 0) / q.usageCount) * 100) : 0 }} doğru</span>
+          </div>
+          <div class="text-sm font-semibold text-slate-900 dark:text-white whitespace-pre-line">{{ q.prompt }}</div>
+          <ul class="mt-2 space-y-1">
+            @for (o of q.options; track o.id) {
+              <li class="text-xs px-2.5 py-1.5 rounded-lg" [class]="o.id === q.correctOptionId ? 'bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/50 dark:text-emerald-300' : 'text-slate-600 dark:text-slate-300'">
+                {{ o.id.toUpperCase() }}) {{ o.text }}
+              </li>
+            }
+          </ul>
+          <div class="flex flex-wrap gap-2 mt-3">
+            @if (q.reviewStatus !== 'approved') { <button class="btn-success btn-sm" (click)="setStatus(q, 'approved')">Onayla</button> }
+            @if (q.reviewStatus !== 'draft') { <button class="btn-ghost btn-sm" (click)="setStatus(q, 'draft')">Taslağa al</button> }
+            @if (q.reviewStatus !== 'rejected') { <button class="btn-ghost btn-sm !text-rose-600" (click)="setStatus(q, 'rejected')">Reddet</button> }
+            <button class="btn-ghost btn-sm ml-auto" (click)="remove(q)"><app-icon name="trash" size="w-3.5 h-3.5" /> Sil</button>
+          </div>
+        </div>
+      } @empty {
+        @if (!qLoading()) { <app-empty icon="book" title="Bu filtrede soru yok" /> }
+      }
+    </div>
+  </div>
+}

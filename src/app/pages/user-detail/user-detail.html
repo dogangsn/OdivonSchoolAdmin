@@ -1,0 +1,267 @@
+<a routerLink="/kullanicilar" class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-indigo-600 mb-4">
+  <app-icon name="chevronLeft" size="w-4 h-4" /> Kullanıcılar
+</a>
+
+@if (loading() && !user()) {
+  <div class="skeleton h-40 mb-5"></div>
+  <div class="grid grid-cols-4 gap-5"><div class="skeleton h-28"></div><div class="skeleton h-28"></div><div class="skeleton h-28"></div><div class="skeleton h-28"></div></div>
+} @else if (notFound()) {
+  <div class="card"><app-empty icon="users" title="Kullanıcı bulunamadı" [text]="'UID: ' + uid()" /></div>
+} @else if (user(); as u) {
+  <!-- Profile header -->
+  <div class="card overflow-hidden mb-5">
+    <div class="h-24 bg-gradient-to-r from-indigo-500 via-purple-500 to-fuchsia-500"></div>
+    <div class="px-6 pb-6 -mt-10 flex flex-col md:flex-row md:items-end gap-5">
+      <div class="ring-4 ring-white dark:ring-slate-900 rounded-full w-fit"><app-avatar [name]="u.displayName || u.email" [size]="84" /></div>
+      <div class="flex-1 min-w-0">
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{{ u.displayName || 'İsimsiz' }}</h1>
+          <app-badge tone="indigo">{{ roleLabel(u.role) }}</app-badge>
+          <app-badge [tone]="statusTone()">{{ u.suspended ? 'Askıda' : statusLabels[status()] }}</app-badge>
+          @if (u.role === 'teacher') {
+            <app-badge [tone]="u.teacherVerified ? 'emerald' : 'amber'">{{ u.teacherVerified ? 'Onaylı öğretmen' : 'Onay bekliyor' }}</app-badge>
+          }
+        </div>
+        <div class="text-sm text-slate-500 mt-1 flex flex-wrap gap-x-4 gap-y-1">
+          <span>{{ isStudentAccountEmail(u.email) ? 'Kullanıcı adı: ' + (u.username || '—') + ' (öğretmen açtı)' : u.email }}</span>
+          @if (u.school) { <span>🏫 {{ u.school }}{{ u.branch ? ' · ' + u.branch : '' }}</span> }
+          @if (u.grade) { <span>🎒 {{ u.grade }}. sınıf</span> } @else if (u.gradeLevel) { <span>🎒 {{ levelLabels[u.gradeLevel] }}</span> }
+          <span>Kayıt {{ fmtDate(u.createdAt) }}</span>
+          <span>Son görülme {{ ago(u.lastSeenAt) }}</span>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn-ghost btn-sm" (click)="copy(u.uid)">UID kopyala</button>
+        @if (!isStudentAccountEmail(u.email)) {
+          <a class="btn-ghost btn-sm" [href]="'mailto:' + u.email">E-posta gönder</a>
+        }
+      </div>
+    </div>
+    @if (u.suspended) {
+      <div class="mx-6 mb-6 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-300">
+        Hesap askıda{{ u.suspendedReason ? ': ' + u.suspendedReason : '' }}
+      </div>
+    }
+  </div>
+
+  <!-- KPIs -->
+  <div class="grid grid-cols-2 xl:grid-cols-5 gap-4 mb-5">
+    <app-kpi label="Test" [value]="attempts().length" icon="doc" tone="sky" [hint]="questionsSolved() + ' soru'" />
+    <app-kpi label="Başarı" [value]="'%' + successRate()" icon="check" tone="emerald" hint="Tüm testler" />
+    <app-kpi label="Oyun" [value]="games().length" icon="game" tone="amber" [hint]="(u.xp ?? 0) + ' XP · 🔥 ' + (u.streakDays ?? 0) + ' gün'" />
+    <app-kpi label="Aktif gün (30g)" [value]="activeDays30()" icon="pulse" tone="indigo" [hint]="studyMinutes() + ' dk çalışma'" />
+    <app-kpi label="Ödenen toplam" [value]="tl(paidTotal())" icon="money" tone="purple" [hint]="'MRR katkısı ' + tl(mrr())" />
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+    <!-- Left: detail tabs -->
+    <div class="xl:col-span-2 space-y-5">
+      <div class="seg">
+        @for (t of [
+          { k: 'overview', l: 'Özet' },
+          { k: 'tests', l: 'Testler (' + attempts().length + ')' },
+          { k: 'games', l: 'Oyunlar (' + games().length + ')' },
+          { k: 'payments', l: 'Ödemeler (' + payments().length + ')' },
+          { k: 'history', l: 'Geçmiş (' + events().length + ')' }
+        ]; track t.k) {
+          <button [class.on]="tab() === t.k" (click)="tab.set($any(t.k))">{{ t.l }}</button>
+        }
+      </div>
+
+      @switch (tab()) {
+        @case ('overview') {
+          <div class="card p-6">
+            <div class="card-title">Son 30 gün aktivite</div>
+            <div class="card-sub mb-4">Günlük test + oyun sayısı</div>
+            <app-bar-chart [data]="activity()" [height]="130" />
+          </div>
+          <div class="grid md:grid-cols-2 gap-5">
+            <div class="card p-6">
+              <div class="card-title">Derslere göre başarı</div>
+              <div class="card-sub mb-4">Doğru / toplam soru</div>
+              <app-hbars [data]="bySubject()" unit="%" [scale]="100" color="#10b981" />
+            </div>
+            <div class="card p-6">
+              <div class="card-title">Oynanan oyunlar</div>
+              <div class="card-sub mb-4">Türlere göre</div>
+              <app-hbars [data]="byGame()" color="#f59e0b" />
+            </div>
+          </div>
+          @if (u.badges?.length) {
+            <div class="card p-6">
+              <div class="card-title mb-3">Rozetler ({{ u.badges!.length }})</div>
+              <div class="flex flex-wrap gap-2">
+                @for (b of u.badges; track b) { <app-badge tone="purple">{{ b }}</app-badge> }
+              </div>
+            </div>
+          }
+        }
+        @case ('tests') {
+          <div class="card overflow-hidden">
+            <div class="overflow-x-auto custom-scroll">
+              <table class="data">
+                <thead><tr><th>Tarih</th><th>Ders</th><th>Kademe</th><th>Doğru</th><th>Başarı</th></tr></thead>
+                <tbody>
+                  @for (a of attempts().slice(0, 100); track a.id) {
+                    <tr>
+                      <td class="text-xs whitespace-nowrap">{{ fmtDateTime(a.startedAt) }}</td>
+                      <td class="font-semibold">{{ a.subject }}</td>
+                      <td class="text-xs">{{ a.level }}</td>
+                      <td class="text-xs">{{ a.correctCount }} / {{ a.totalCount }}</td>
+                      <td class="font-black" [class]="rateTone(a.successRate)">%{{ a.successRate }}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="5"><app-empty icon="doc" title="Test yok" /></td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+        @case ('games') {
+          <div class="card overflow-hidden">
+            <div class="overflow-x-auto custom-scroll">
+              <table class="data">
+                <thead><tr><th>Tarih</th><th>Oyun</th><th>İçerik</th><th>Doğru</th><th>Puan</th><th>Yıldız</th></tr></thead>
+                <tbody>
+                  @for (g of games().slice(0, 100); track g.id) {
+                    <tr>
+                      <td class="text-xs whitespace-nowrap">{{ fmtDateTime(g.createdAt) }}</td>
+                      <td class="font-semibold whitespace-nowrap">{{ gameLabels[g.gameType] ?? g.gameType }}</td>
+                      <td class="text-xs">{{ g.title }}{{ g.assignmentId ? ' · ödev' : '' }}</td>
+                      <td class="text-xs">{{ g.correct }} / {{ g.total }}</td>
+                      <td class="font-bold">{{ g.score }}</td>
+                      <td class="text-amber-500">{{ '★'.repeat(g.stars) }}<span class="text-slate-300">{{ '★'.repeat(3 - g.stars) }}</span></td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="6"><app-empty icon="game" title="Oyun yok" /></td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+        @case ('payments') {
+          <div class="card overflow-hidden">
+            <div class="overflow-x-auto custom-scroll">
+              <table class="data">
+                <thead><tr><th>Tarih</th><th>Sipariş</th><th>Plan</th><th>Tutar</th><th>Durum</th></tr></thead>
+                <tbody>
+                  @for (p of payments(); track p.id) {
+                    <tr>
+                      <td class="text-xs whitespace-nowrap">{{ fmtDateTime(p.createdAt) }}</td>
+                      <td class="text-[11px] font-mono text-slate-500">{{ p.id }}</td>
+                      <td class="text-xs">{{ plans[p.plan].label }} · {{ p.period === 'yearly' ? 'Yıllık' : 'Aylık' }}</td>
+                      <td class="font-black">{{ tl(p.totalAmount ?? p.amount) }}</td>
+                      <td><app-badge [tone]="payTone(p.status)">{{ payLabels[p.status] }}{{ p.testMode ? ' · test' : '' }}</app-badge></td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="5"><app-empty icon="receipt" title="Ödeme yok" /></td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+        @case ('history') {
+          <div class="card p-6">
+            <ol class="relative border-l border-slate-200 dark:border-slate-800 ml-3 space-y-5">
+              @for (e of events(); track e.id) {
+                <li class="pl-6 relative">
+                  <span class="absolute -left-[13px] top-0 w-6 h-6 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs">{{ eventIcon(e.type) }}</span>
+                  <div class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ e.summary }}</div>
+                  <div class="text-[11px] text-slate-400 mt-0.5">{{ e.byName }} · {{ fmtDateTime(e.at) }}</div>
+                </li>
+              } @empty {
+                <li class="pl-6 text-xs text-slate-400">Bu kullanıcı için kayıt yok.</li>
+              }
+            </ol>
+          </div>
+        }
+      }
+    </div>
+
+    <!-- Right: management -->
+    <div class="space-y-5">
+      <div class="card p-6">
+        <div class="flex items-center justify-between mb-1">
+          <div class="card-title">Abonelik</div>
+          <app-badge [tone]="statusTone()">{{ plans[plan()].label }}</app-badge>
+        </div>
+        <div class="card-sub mb-4">
+          @if (u.subscriptionExpiresAt) {
+            Bitiş {{ fmtDate(u.subscriptionExpiresAt) }}
+            @if (left() !== null) { · {{ left()! < 0 ? (-left()!) + ' gün önce bitti' : left() + ' gün kaldı' }} }
+            · kaynak {{ u.subscriptionSource || 'manual' }}
+          } @else { Aktif abonelik yok }
+        </div>
+
+        <label class="label">Plan</label>
+        <div class="seg w-full mb-3">
+          <button class="flex-1" [class.on]="formPlan() === 'pro'" (click)="formPlan.set('pro')">Pro ₺{{ plans.pro.monthlyPrice }}</button>
+          <button class="flex-1" [class.on]="formPlan() === 'vip'" (click)="formPlan.set('vip')">VIP ₺{{ plans.vip.monthlyPrice }}</button>
+        </div>
+        <label class="label">Dönem</label>
+        <div class="seg w-full mb-3">
+          <button class="flex-1" [class.on]="formPeriod() === 'monthly'" (click)="setPeriod('monthly')">Aylık</button>
+          <button class="flex-1" [class.on]="formPeriod() === 'yearly'" (click)="setPeriod('yearly')">Yıllık</button>
+        </div>
+        <label class="label">Bitiş tarihi</label>
+        <input type="date" class="input mb-4" [ngModel]="formEnd()" (ngModelChange)="formEnd.set($event)" />
+        <button class="btn-primary w-full" [disabled]="busy()" (click)="saveSubscription()">Aboneliği kaydet</button>
+
+        <div class="grid grid-cols-3 gap-2 mt-3">
+          <button class="btn-ghost btn-sm" [disabled]="busy()" (click)="extend(7)">+7 gün</button>
+          <button class="btn-ghost btn-sm" [disabled]="busy()" (click)="extend(30)">+30 gün</button>
+          <button class="btn-ghost btn-sm" [disabled]="busy()" (click)="extend(365)">+1 yıl</button>
+        </div>
+
+        <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <label class="label">Deneme başlat (gün)</label>
+          <div class="flex gap-2">
+            <input type="number" min="1" max="90" class="input" [ngModel]="trialDays()" (ngModelChange)="trialDays.set($event)" />
+            <button class="btn-ghost" [disabled]="busy()" (click)="startTrial()">Başlat</button>
+          </div>
+        </div>
+        <div class="flex gap-2 mt-4">
+          <button class="btn-ghost btn-sm flex-1 !text-rose-600" [disabled]="busy()" (click)="endNow()">Şimdi sonlandır</button>
+          <button class="btn-ghost btn-sm flex-1" [disabled]="busy()" (click)="resetToFree()">Ücretsize al</button>
+        </div>
+      </div>
+
+      <div class="card p-6">
+        <div class="card-title mb-4">Hesap</div>
+        <label class="label">Rol</label>
+        <div class="flex gap-2 mb-4">
+          <select class="input" [ngModel]="formRole()" (ngModelChange)="formRole.set($event)" [disabled]="isSelf()">
+            <option value="student">Öğrenci</option>
+            <option value="teacher">Öğretmen</option>
+            <option value="admin">Yönetici</option>
+          </select>
+          <button class="btn-ghost" [disabled]="busy() || isSelf()" (click)="saveRole()">Kaydet</button>
+        </div>
+        @if (u.role === 'teacher') {
+          <button class="w-full mb-4" [class]="u.teacherVerified ? 'btn-ghost' : 'btn-success'" [disabled]="busy()" (click)="toggleTeacherVerified()">
+            {{ u.teacherVerified ? 'Öğretmen onayını kaldır' : 'Öğretmeni onayla' }}
+          </button>
+        }
+        @if (u.suspended) {
+          <button class="btn-success w-full" [disabled]="busy()" (click)="unsuspend()">Askıyı kaldır</button>
+        } @else {
+          <label class="label">Askıya alma sebebi</label>
+          <input class="input mb-2" placeholder="İsteğe bağlı" [ngModel]="suspendReason()" (ngModelChange)="suspendReason.set($event)" [disabled]="isSelf()" />
+          <button class="btn-danger w-full" [disabled]="busy() || isSelf()" (click)="suspend()">Hesabı askıya al</button>
+        }
+      </div>
+
+      <div class="card p-6">
+        <div class="card-title">Yönetici notu</div>
+        <div class="card-sub mb-3">
+          @if (note()) { {{ note()!.byName }} · {{ ago(note()!.updatedAt) }} } @else { Yalnızca yöneticiler görür }
+        </div>
+        <textarea class="input min-h-28" maxlength="4000" [ngModel]="noteDraft()" (ngModelChange)="noteDraft.set($event)" placeholder="Görüşme, fatura, özel durum…"></textarea>
+        <button class="btn-primary w-full mt-3" [disabled]="busy()" (click)="saveNote()">Notu kaydet</button>
+      </div>
+    </div>
+  </div>
+}
